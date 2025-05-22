@@ -29,4 +29,4 @@ How I set up my inventory. I set up my functions in `main.py` with this format i
 
 ## Notes:
 - The google api only supports so many actions per minute, so if you want to add and retrieve data from your sheet keep that in mind. This is why I gather a list data struct and push the whole list to the sheet at once when updating the rename column.
-- 
+- When I run this to update card names I will do one set list at a time to make sure I do not hit the google actions limit.
