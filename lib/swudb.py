@@ -16,6 +16,9 @@ def get_swu_list(set_name):
     if set_name == 'jtl':
         jtl_url = 'https://api.swu-db.com/cards/jtl'
         response = requests.get(jtl_url)
+    if set_name == 'lof':
+        lof_url = 'https://api.swu-db.com/cards/lof'
+        response = requests.get(lof_url)
 
     try:
         df = False
@@ -27,7 +30,7 @@ def get_swu_list(set_name):
         return df
 
     except NameError:
-        print("No valid set specified: sor, shd, twi, jtl")
+        print("No valid set specified: sor, shd, twi, jtl, lof")
         return False
 
 def get_card_name(list_df, num):

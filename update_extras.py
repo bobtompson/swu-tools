@@ -20,7 +20,7 @@ def get_doc_sheet(sheet_name):
     client = gspread.authorize(creds)
 
     # Open the spreadsheet and select a worksheet
-    spreadsheet = client.open("SWU Sets Inventory")
+    spreadsheet = client.open("SWU Sets Extra Inventory")
     return spreadsheet.worksheet(sheet_name)
 
 
@@ -39,7 +39,7 @@ def test_sheets():
 
 
     # Open the spreadsheet and select a worksheet
-    spreadsheet = client.open("SWU Sets Inventory")
+    spreadsheet = client.open("SWU Sets Extra Inventory")
     # sheet = spreadsheet.sheet1  # Or use .worksheet("Sheet1")
     sheet = spreadsheet.worksheet("SOR")
     card_num = sheet.cell(12,1).value
@@ -77,8 +77,8 @@ def update_list_names(card_list):
 if __name__ == '__main__':
     update_list_names('lof')
     # Already Run
-    #update_list_names('sor')
-    #update_list_names('shd')
+    # update_list_names('sor')
+    # update_list_names('shd')
     # update_list_names('twi')
     # update_list_names('jtl')
 
