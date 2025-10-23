@@ -55,8 +55,11 @@ def update_list_names(card_list):
     set_df = swudb.get_swu_list(card_list.lower())
 
     card_count = int(sheet.cell(1,8).value)
+    db_count = len(set_df)
 
     print(f"Card count: {card_count} for {card_list.upper()}")
+    print(f"DB returned: {db_count} cards for {card_list.upper()}")
+
     curr_num = 1
     card_names = []
     card_rarity = []
@@ -75,10 +78,12 @@ def update_list_names(card_list):
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    update_list_names('lof')
+    update_list_names("sec")
+
     # Already Run
-    #update_list_names('sor')
-    #update_list_names('shd')
+    # update_list_names('lof')
+    # update_list_names('sor')
+    # update_list_names('shd')
     # update_list_names('twi')
     # update_list_names('jtl')
 

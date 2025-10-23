@@ -19,10 +19,13 @@ def get_swu_list(set_name):
     if set_name == 'lof':
         lof_url = 'https://api.swu-db.com/cards/lof'
         response = requests.get(lof_url)
+    if set_name == 'sec':
+        sec_url = 'https://api.swu-db.com/cards/sec'
+        response = requests.get(sec_url)
 
     try:
         df = False
-        if(response.status_code == 200):
+        if response.status_code == 200:
             print(f"{set_name.upper()} Card List Retrieved")
             set_json = response.json()
             # print_json(data=set_json)
@@ -30,21 +33,35 @@ def get_swu_list(set_name):
         return df
 
     except NameError:
-        print("No valid set specified: sor, shd, twi, jtl, lof")
+        print("No valid set specified: sor, shd, twi, jtl, lof, sec")
         return False
 
 def get_card_name(list_df, num):
 # Returns the string of card name in a card list
-    name = str(list_df[list_df['Number'] == num].iloc[0]['Name'])
-    # print(f"Card {num}: {name}")
+    match = list_df[list_df['Number'] == num]
+    if not match.empty:
+        name = str(list_df[list_df['Number'] == num].iloc[0]['Name'])
+        # print(f"Card {num}: {name}")
+    else:
+        name = ""
+
     return name
+
 
 def get_card_rarity(list_df, num):
 # Returns the string of card rarity in a card list
-    rarity = str(list_df[list_df['Number'] == num].iloc[0]['Rarity'])
-    # print(f"Card {num}: {name}")
+    match = list_df[list_df['Number'] == num]
+    if not match.empty:
+        rarity = str(list_df[list_df['Number'] == num].iloc[0]['Rarity'])
+        # print(f"Card {num}: {name}")
+    else:
+        rarity = ""
     return rarity[:1]
 
 def get_card(list_df, num):
-    card = list_df[list_df['Number'] == num].iloc[0]
+    match = list_df[list_df['Number'] == num]
+    if not match.empty:
+        card = list_df[list_df['Number'] == num].iloc[0]
+    else:
+        card = "Not Found"
     print(card)
