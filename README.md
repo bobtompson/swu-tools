@@ -15,7 +15,8 @@ Note: If you are not sure how to do this. ChatGPT generated a step by step how-t
 
 ## Files
 - `main.py` will download card lists as json from a swudb api into a pandas dataframe. It then will pull cards names and rarity into the columns I specify.
-- `./lib/swudb.py` library functions to pull card lists based on set abbreviation name "SOR, SHD, TWI, JTL, etc"
+- `./lib/swudb.py` library functions to pull card lists based on set abbreviation name "SOR, SHD, TWI, JTL, LOF, SEC"
+- `./card_data/` cached JSON files for each set (loaded before hitting the API)
 - `lookup_card.py` Start of a card lookup script, should pull all info of a card based on set and card number and print it to console.
 - `sort_deck_by_set.py` Takes a deck list and outputs cards sorted by set. Useful for gathering cards from binders organized by set.
 
