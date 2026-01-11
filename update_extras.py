@@ -1,10 +1,7 @@
 import lib.swudb as swudb
 
-import requests
-import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-# from rich import print_json
 
 
 def get_doc_sheet(sheet_name):
@@ -49,12 +46,17 @@ def test_sheets():
     print(f"Card {card_num}: {card_name}")
 
 def update_list_names(card_list):
-# Update the names and rarity columns in my inventory spreadsheet in google
-# Each Subsheet is a set name abbr
-    sheet = get_doc_sheet(card_list.upper())
+    """Update the names and rarity columns in my extras inventory spreadsheet.
+    Each Subsheet is a set name abbr.
+    """
     set_df = swudb.get_swu_list(card_list.lower())
 
-    card_count = int(sheet.cell(1,8).value)
+    if set_df is None:
+        print(f"Failed to get card data for {card_list.upper()}, aborting update.")
+        return
+
+    sheet = get_doc_sheet(card_list.upper())
+    card_count = int(sheet.cell(1, 8).value)
 
     print(f"Card count: {card_count} for {card_list.upper()}")
     curr_num = 1
