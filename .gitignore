@@ -16,4 +16,7 @@ wheels/
 credentials.json
 google.text
 
+# Deck lists
+swudb_lists/
+
 
