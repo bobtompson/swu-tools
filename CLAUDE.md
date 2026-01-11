@@ -21,6 +21,9 @@ uv run python update_extras.py
 # Run card lookup utility
 uv run python lookup_card.py
 
+# Sort a deck list by set (for gathering cards from binders)
+uv run python sort_deck_by_set.py "swudb_lists/deck-Picklist.txt"
+
 # Lint with ruff
 uv run ruff check .
 ```
@@ -35,6 +38,14 @@ uv run ruff check .
   - `get_card_rarity(df, num)`: Returns first letter of rarity
 
 - **credentials.json**: Google API service account credentials (required for Google Sheets access)
+
+- **sort_deck_by_set.py**: Deck list sorter for gathering cards from set-organized binders
+  - Parses Picklist (.txt) or JSON (.json) deck exports from swudb.com
+  - Groups cards by set, sorted by card number within each set
+  - Prefers main sets (SOR, SHD, TWI, JTL, LOF, SEC) over promo sets for reprints
+  - Shows "(also in: X, Y)" for cards printed in multiple sets
+  - Outputs to console and saves `{filename}-sorted.md` in same folder
+  - JSON format triggers API lookups to get card names
 
 ## Google Sheets Structure
 

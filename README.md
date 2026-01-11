@@ -17,7 +17,26 @@ Note: If you are not sure how to do this. ChatGPT generated a step by step how-t
 - `main.py` will download card lists as json from a swudb api into a pandas dataframe. It then will pull cards names and rarity into the columns I specify.
 - `./lib/swudb.py` library functions to pull card lists based on set abbreviation name "SOR, SHD, TWI, JTL, etc"
 - `lookup_card.py` Start of a card lookup script, should pull all info of a card based on set and card number and print it to console.
-- Adding more look ups as I need them.
+- `sort_deck_by_set.py` Takes a deck list and outputs cards sorted by set. Useful for gathering cards from binders organized by set.
+
+## Deck Sorting Tool
+The `sort_deck_by_set.py` script helps gather cards for a deck from set-organized binders.
+
+**Usage:**
+```bash
+uv run python sort_deck_by_set.py "path/to/decklist.txt"
+```
+
+**Features:**
+- Supports Picklist (.txt) and JSON (.json) deck formats from swudb.com
+- Groups cards by set (SOR, SHD, TWI, JTL, LOF, SEC), sorted by card number
+- Prefers main sets over promo printings for cards in multiple sets
+- Shows alternate sets for reprints (e.g., "also in: P25, LOFP")
+- Outputs to console and saves a `-sorted.md` file in the same folder
+
+**Input formats:**
+- Picklist format: Export from swudb.com deck builder (has card names + all set printings)
+- JSON format: Export from swudb.com (has set/number, card names fetched via API)
 
 ## Google Sheet Inventory
 How I set up my inventory. I set up my functions in `main.py` with this format in mind.
