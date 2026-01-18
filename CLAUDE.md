@@ -24,6 +24,18 @@ uv run python lookup_card.py
 # Sort a deck list by set (for gathering cards from binders)
 uv run python sort_deck_by_set.py "swudb_lists/deck-Picklist.txt"
 
+# Import and sort a deck directly from SWUDB URL
+uv run python sort_deck_by_set.py "https://www.swudb.com/deck/RawKbHItN"
+
+# Import with custom output directory
+uv run python sort_deck_by_set.py "https://www.swudb.com/deck/RawKbHItN" /path/to/output
+
+# Track cards in use across multiple decks
+uv run python update_used_card_list.py add "https://www.swudb.com/deck/RawKbHItN"
+uv run python update_used_card_list.py remove "https://www.swudb.com/deck/RawKbHItN"
+uv run python update_used_card_list.py list
+uv run python update_used_card_list.py export
+
 # Lint with ruff
 uv run ruff check .
 ```
@@ -42,12 +54,22 @@ uv run ruff check .
 - **credentials.json**: Google API service account credentials (required for Google Sheets access)
 
 - **sort_deck_by_set.py**: Deck list sorter for gathering cards from set-organized binders
-  - Parses Picklist (.txt) or JSON (.json) deck exports from swudb.com
+  - Parses Picklist (.txt), JSON (.json) deck exports, or imports directly from SWUDB deck URLs
   - Groups cards by set, sorted by card number within each set
   - Prefers main sets (SOR, SHD, TWI, JTL, LOF, SEC) over promo sets for reprints
   - Shows "(also in: X, Y)" for cards printed in multiple sets
-  - Outputs to console and saves `{filename}-sorted.md` in same folder
-  - JSON format triggers API lookups to get card names
+  - Outputs to console and saves sorted markdown file
+  - URL imports save to `swudb_lists/` by default (uses deck name from website)
+  - Optional second argument specifies custom output directory
+
+- **update_used_card_list.py**: Track cards in use across multiple SWUDB decks
+  - Maintains SQLite database at `card_data/cards_in_use.db`
+  - Exports markdown summary to `swudb_lists/cards_in_use.md`
+  - Commands: `add <url>`, `remove <url>`, `list`, `export`
+  - Tracks deck format: Premier (deckFormat=1) or Twin Suns (deckFormat=2)
+  - Cards identified by canonical (primary_set, primary_number) tuple
+  - Tracks use_count per card - incremented on add, decremented on remove
+  - Cards with use_count=0 are automatically removed from database
 
 ## Google Sheets Structure
 

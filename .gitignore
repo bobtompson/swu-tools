@@ -1,16 +1,69 @@
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
 # Python-generated files
 __pycache__/
 *.py[oc]
+*.pyc
+*.pyo
+*.pyd
+.Python
 build/
 dist/
 wheels/
-*.egg-info
+*.egg-info/
+*.egg
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+htmlcov/
+*.so
+*.dylib
 
 # Virtual environments
 .venv
+venv/
+ENV/
+env/
+.ENV
 
-.idea
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
 
+# Environment files
+.env
+.env.local
+.env.*.local
+*.log
+
+# Build artifacts
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+node_modules/
+.npm
+.yarn/
 
 # Google api auth
 credentials.json
@@ -19,4 +72,5 @@ google.text
 # Deck lists
 swudb_lists/
 
-
+# Card data
+card_data/

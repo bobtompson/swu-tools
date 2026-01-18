@@ -19,6 +19,7 @@ Note: If you are not sure how to do this. ChatGPT generated a step by step how-t
 - `./card_data/` cached JSON files for each set (loaded before hitting the API)
 - `lookup_card.py` Start of a card lookup script, should pull all info of a card based on set and card number and print it to console.
 - `sort_deck_by_set.py` Takes a deck list and outputs cards sorted by set. Useful for gathering cards from binders organized by set.
+- `update_used_card_list.py` Tracks all cards in use across multiple SWUDB decks. Maintains a SQLite database and exports a markdown summary.
 
 ## Deck Sorting Tool
 The `sort_deck_by_set.py` script helps gather cards for a deck from set-organized binders.
@@ -38,6 +39,54 @@ uv run python sort_deck_by_set.py "path/to/decklist.txt"
 **Input formats:**
 - Picklist format: Export from swudb.com deck builder (has card names + all set printings)
 - JSON format: Export from swudb.com (has set/number, card names fetched via API)
+
+## Used Card List Tracker
+
+The `update_used_card_list.py` script tracks all cards in use across multiple SWUDB decks.
+
+**Usage:**
+```bash
+# Add a deck to tracking
+uv run python update_used_card_list.py add "https://swudb.com/deck/KRvnhNGlV"
+
+# Remove a deck from tracking
+uv run python update_used_card_list.py remove "https://swudb.com/deck/KRvnhNGlV"
+
+# List all tracked decks
+uv run python update_used_card_list.py list
+
+# Regenerate markdown output
+uv run python update_used_card_list.py export
+
+# Remove all decks and archive the markdown file
+uv run python update_used_card_list.py remove-all
+```
+
+**Features:**
+- Tracks cards across multiple decks with quantity per deck
+- Supports both Premier and Twin Suns deck formats (auto-detected from API)
+- Includes main deck and sideboard cards
+- Groups cards by set, sorted by card number
+- Shows total quantity and per-deck breakdown
+
+**Output files:**
+- `card_data/cards_in_use.db` - SQLite database storing decks and cards
+- `swudb_lists/cards_in_use.md` - Markdown summary (auto-generated on add/remove)
+
+**Output format:**
+```
+## Tracked Decks (2)
+- [1] [Deck Name](url) (Premier)
+- [2] [Other Deck](url) (Twin Suns)
+
+## Cards (N unique)
+Format: `- NUMBER: Card Name (xTOTAL) [DECK:QTY, ...]`
+
+### SOR (X cards)
+- 134: Ruthless Raider (x4) [1:1, 2:3]
+```
+
+The `[1:1, 2:3]` means: 1 copy in deck 1, 3 copies in deck 2 (4 total).
 
 ## Google Sheet Inventory
 How I set up my inventory. I set up my functions in `main.py` with this format in mind.
