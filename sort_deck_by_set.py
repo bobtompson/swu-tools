@@ -9,6 +9,12 @@ import requests
 # Main sets in chronological order - prefer these over promos
 MAIN_SETS = ['SOR', 'SHD', 'TWI', 'JTL', 'LOF', 'SEC']
 
+# Deck format mapping
+DECK_FORMATS = {
+    1: 'Premier',
+    2: 'Twin Suns'
+}
+
 # Default output directory for URL imports
 DEFAULT_OUTPUT_DIR = 'swudb_lists'
 
@@ -47,7 +53,7 @@ def get_card_name_from_api(set_abbr, card_num):
     return _set_cache.get(set_lower, {}).get(card_num)
 
 def parse_picklist(filepath):
-    """Parse a Picklist format file and return list of card dicts."""
+    """Parse a Picklist format file and return (cards, metadata)."""
     cards = []
 
     with open(filepath, 'r', encoding='utf-8') as f:
@@ -84,7 +90,17 @@ def parse_picklist(filepath):
                     i += 1  # Skip the set codes line
         i += 1
 
-    return cards
+    # Picklist files don't have deck metadata - use filename as title
+    metadata = {
+        'title': os.path.splitext(os.path.basename(filepath))[0],
+        'author': None,
+        'format': None,
+        'leader': None,
+        'second_leader': None,
+        'base': None
+    }
+
+    return cards, metadata
 
 
 def parse_set_codes(line):
@@ -108,12 +124,57 @@ def select_primary_set(set_codes):
     return set_codes[0]
 
 
+def parse_card_id(card_id):
+    """Parse a card ID like 'SEC_018' and return card info dict."""
+    parts = card_id.split('_')
+    if len(parts) == 2:
+        set_abbr, num = parts
+        num_padded = num.zfill(3)
+        # Look up card name from API
+        name = get_card_name_from_api(set_abbr, num_padded)
+        if not name:
+            name = f"[{card_id}]"  # Fallback if API lookup fails
+        return {
+            'name': name,
+            'set': set_abbr,
+            'number': num_padded,
+            'alternates': []
+        }
+    return None
+
+
 def parse_json(filepath):
-    """Parse a JSON format deck file and return list of card dicts."""
+    """Parse a JSON format deck file and return (cards, metadata)."""
     with open(filepath, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
     cards = []
+
+    # Extract metadata from file
+    file_metadata = data.get('metadata', {})
+    has_second_leader = 'secondleader' in data and data['secondleader']
+
+    # Parse leader, second leader, and base for metadata
+    leader_info = None
+    second_leader_info = None
+    base_info = None
+
+    if 'leader' in data and data['leader'] and 'id' in data['leader']:
+        leader_info = parse_card_id(data['leader']['id'])
+    if has_second_leader and 'id' in data['secondleader']:
+        second_leader_info = parse_card_id(data['secondleader']['id'])
+    if 'base' in data and data['base'] and 'id' in data['base']:
+        base_info = parse_card_id(data['base']['id'])
+
+    # Build metadata dict
+    metadata = {
+        'title': file_metadata.get('name', os.path.splitext(os.path.basename(filepath))[0]),
+        'author': file_metadata.get('author'),
+        'format': 'Twin Suns' if has_second_leader else 'Premier',
+        'leader': leader_info,
+        'second_leader': second_leader_info,
+        'base': base_info
+    }
 
     # Collect all card entries from different sections
     sections = ['leader', 'secondleader', 'base', 'deck', 'sideboard']
@@ -129,24 +190,11 @@ def parse_json(filepath):
         for item in items:
             if not item or 'id' not in item:
                 continue
-            card_id = item['id']
-            # Parse ID like "SEC_018"
-            parts = card_id.split('_')
-            if len(parts) == 2:
-                set_abbr, num = parts
-                num_padded = num.zfill(3)
-                # Look up card name from API
-                name = get_card_name_from_api(set_abbr, num_padded)
-                if not name:
-                    name = f"[{card_id}]"  # Fallback if API lookup fails
-                cards.append({
-                    'name': name,
-                    'set': set_abbr,
-                    'number': num_padded,
-                    'alternates': []
-                })
+            card_info = parse_card_id(item['id'])
+            if card_info:
+                cards.append(card_info)
 
-    return cards
+    return cards, metadata
 
 
 def is_swudb_url(input_str):
@@ -169,7 +217,7 @@ def extract_deck_id(url):
 
 
 def fetch_deck_from_url(url):
-    """Fetch deck data from SWUDB URL and return list of card dicts."""
+    """Fetch deck data from SWUDB URL and return (cards, metadata)."""
     deck_id = extract_deck_id(url)
     if not deck_id:
         print(f"Error: Could not extract deck ID from URL: {url}")
@@ -201,38 +249,54 @@ def format_card_name(card_data):
     return name
 
 
+def extract_card_info(card_data):
+    """Extract card info dict from SWUDB card data."""
+    if not card_data:
+        return None
+    name = format_card_name(card_data)
+    set_abbr = card_data.get('defaultExpansionAbbreviation', '')
+    num = card_data.get('defaultCardNumber', '').zfill(3)
+    if name and set_abbr:
+        return {
+            'name': name,
+            'set': set_abbr,
+            'number': num,
+            'alternates': []
+        }
+    return None
+
+
 def parse_swudb_json(data, deck_id):
-    """Parse SWUDB JSON response to extract cards and deck name."""
+    """Parse SWUDB JSON response to extract cards and deck metadata."""
     cards = []
-    deck_name = data.get('deckName', deck_id)
 
-    # Helper to add a card from card data
-    def add_card(card_data):
-        if not card_data:
-            return
-        name = format_card_name(card_data)
-        set_abbr = card_data.get('defaultExpansionAbbreviation', '')
-        num = card_data.get('defaultCardNumber', '').zfill(3)
-        if name and set_abbr:
-            cards.append({
-                'name': name,
-                'set': set_abbr,
-                'number': num,
-                'alternates': []
-            })
+    # Extract deck metadata
+    deck_format_code = data.get('deckFormat', 1)
+    metadata = {
+        'title': data.get('deckName', deck_id),
+        'author': data.get('authorName'),
+        'format': DECK_FORMATS.get(deck_format_code, 'Unknown'),
+        'leader': extract_card_info(data.get('leader')),
+        'second_leader': extract_card_info(data.get('secondLeader')),
+        'base': extract_card_info(data.get('base'))
+    }
 
-    # Add leader(s) and base
-    add_card(data.get('leader'))
-    add_card(data.get('secondLeader'))
-    add_card(data.get('base'))
+    # Add leader(s) and base to card list
+    if metadata['leader']:
+        cards.append(metadata['leader'].copy())
+    if metadata['second_leader']:
+        cards.append(metadata['second_leader'].copy())
+    if metadata['base']:
+        cards.append(metadata['base'].copy())
 
     # Add main deck cards from shuffledDeck
     for entry in data.get('shuffledDeck', []):
         card_data = entry.get('card')
-        if card_data:
-            add_card(card_data)
+        card_info = extract_card_info(card_data)
+        if card_info:
+            cards.append(card_info)
 
-    return cards, deck_name
+    return cards, metadata
 
 
 def group_by_set(cards):
@@ -248,9 +312,58 @@ def group_by_set(cards):
     return grouped
 
 
-def format_output(grouped):
-    """Format grouped cards as markdown output."""
+def format_card_reference(card_info):
+    """Format a card reference like 'Card Name (SET 001)'."""
+    if not card_info:
+        return None
+    return f"{card_info['name']} ({card_info['set']} {card_info['number']})"
+
+
+def format_header(metadata):
+    """Format deck metadata as a markdown header."""
     lines = []
+
+    # Title
+    lines.append(f"# {metadata['title']}")
+    lines.append("")
+
+    # Format and Author on same line area
+    info_lines = []
+    if metadata.get('format'):
+        info_lines.append(f"**Format:** {metadata['format']}")
+    if metadata.get('author'):
+        info_lines.append(f"**Author:** {metadata['author']}")
+
+    if info_lines:
+        lines.append("  \n".join(info_lines))
+        lines.append("")
+
+    # Leader(s) and Base
+    card_lines = []
+    if metadata.get('leader'):
+        card_lines.append(f"**Leader:** {format_card_reference(metadata['leader'])}")
+    if metadata.get('second_leader'):
+        card_lines.append(f"**Leader 2:** {format_card_reference(metadata['second_leader'])}")
+    if metadata.get('base'):
+        card_lines.append(f"**Base:** {format_card_reference(metadata['base'])}")
+
+    if card_lines:
+        lines.append("  \n".join(card_lines))
+        lines.append("")
+
+    # Separator
+    lines.append("---")
+
+    return '\n'.join(lines)
+
+
+def format_output(grouped, metadata=None):
+    """Format grouped cards as markdown output with optional header."""
+    lines = []
+
+    # Add header if metadata is provided
+    if metadata:
+        lines.append(format_header(metadata))
 
     # Sort sets: main sets first in order, then promo/special sets alphabetically
     all_sets = list(grouped.keys())
@@ -317,20 +430,20 @@ def main():
 
     # Check if input is a URL
     if is_swudb_url(input_arg):
-        cards, deck_name = fetch_deck_from_url(input_arg)
+        cards, metadata = fetch_deck_from_url(input_arg)
         if not cards:
             print("No cards found from URL.")
             sys.exit(1)
-        output_path = get_url_output_path(deck_name, output_dir)
+        output_path = get_url_output_path(metadata['title'], output_dir)
     else:
         # File-based input
         filepath = input_arg
         file_format = detect_format(filepath)
 
         if file_format == 'json':
-            cards = parse_json(filepath)
+            cards, metadata = parse_json(filepath)
         else:
-            cards = parse_picklist(filepath)
+            cards, metadata = parse_picklist(filepath)
 
         if not cards:
             print("No cards found in file.")
@@ -345,7 +458,7 @@ def main():
             output_path = get_output_path(filepath)
 
     grouped = group_by_set(cards)
-    output = format_output(grouped)
+    output = format_output(grouped, metadata)
 
     # Print to console
     print(output)
