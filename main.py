@@ -89,6 +89,9 @@ if __name__ == '__main__':
     # update_list_names('twi')
     # update_list_names('jtl')
 
+    # Not yet released
+    # update_list_names('law')  # A Lawless Time - releases 2026-03-06
+
 
 
 

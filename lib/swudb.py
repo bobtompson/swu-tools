@@ -4,7 +4,7 @@ import json
 import os
 
 # Valid set abbreviations
-VALID_SETS = ['sor', 'shd', 'twi', 'jtl', 'lof', 'sec']
+VALID_SETS = ['sor', 'shd', 'twi', 'jtl', 'lof', 'sec', 'law']
 
 # Directory for cached card data
 CACHE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'card_data')
