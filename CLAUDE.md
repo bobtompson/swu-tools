@@ -36,6 +36,9 @@ uv run python update_used_card_list.py remove "https://www.swudb.com/deck/RawKbH
 uv run python update_used_card_list.py list
 uv run python update_used_card_list.py export
 
+# Validate a SWUDB deck for Premier, Eternal, and Twin Suns
+uv run python validate_deck_format.py "https://www.swudb.com/deck/RawKbHItN"
+
 # Lint with ruff
 uv run ruff check .
 ```
@@ -48,6 +51,7 @@ uv run ruff check .
   - `get_swu_list(set_name, force_refresh=False)`: Gets all cards for a set, checks local cache first then API. Use `force_refresh=True` to bypass cache.
   - `get_card_name(df, num)`: Returns card name by 3-digit number
   - `get_card_rarity(df, num)`: Returns first letter of rarity
+  - Set support is centralized here. Main release sets are `SOR`, `SHD`, `TWI`, `JTL`, `LOF`, `SEC`, `LAW`; supplemental Twin Suns 2026 deck cards use `TS26`
 
 - **card_data/**: Local JSON cache for card data (one file per set). Checked before making API calls. Data is stable after set release so this is tracked in git.
 
@@ -56,7 +60,8 @@ uv run ruff check .
 - **sort_deck_by_set.py**: Deck list sorter for gathering cards from set-organized binders
   - Parses Picklist (.txt), JSON (.json) deck exports, or imports directly from SWUDB deck URLs
   - Groups cards by set, sorted by card number within each set
-  - Prefers main sets (SOR, SHD, TWI, JTL, LOF, SEC) over promo sets for reprints
+  - Prefers main release sets (`SOR`, `SHD`, `TWI`, `JTL`, `LOF`, `SEC`, `LAW`) over promos for reprints
+  - Recognizes `TS26` as the Twin Suns 2026 supplemental set code
   - Shows "(also in: X, Y)" for cards printed in multiple sets
   - Outputs to console and saves sorted markdown file
   - URL imports save to `swudb_lists/` by default (uses deck name from website)
@@ -71,10 +76,19 @@ uv run ruff check .
   - Tracks use_count per card - incremented on add, decremented on remove
   - Cards with use_count=0 are automatically removed from database
 
+- **validate_deck_format.py**: Validate a SWUDB deck against sourced format rules
+  - Fetches deck JSON from `www.swudb.com/api/deck/{id}`
+  - Detects whether the submitted deck is Premier-style constructed or Twin Suns
+  - Reports legality for Premier, Eternal, and Twin Suns with explicit failure reasons
+  - Premier checks currently include structural rules, set rotation, `TS26` exclusion, and known Premier suspensions
+  - Premier reprint legality currently matches on the full printed card name, including title when present
+  - Eternal currently uses constructed structure only; all cards are treated as legal in Eternal
+  - Twin Suns checks currently include 2 leaders, shared Heroism/Villainy alignment, 80-card minimum, and singleton deckbuilding, with all cards treated as legal in Twin Suns
+
 ## Google Sheets Structure
 
 The inventory spreadsheets expect:
-- Each set has its own tab named by abbreviation (SOR, SHD, TWI, JTL, LOF, SEC)
+- Each set has its own tab named by abbreviation (currently `SOR`, `SHD`, `TWI`, `JTL`, `LOF`, `SEC`, `LAW`)
 - Cell H1: Total card count for the set
 - Column B (starting B3): Card names
 - Column D (starting D3): Card rarities (single letter)

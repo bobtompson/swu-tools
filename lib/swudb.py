@@ -3,8 +3,19 @@ import pandas as pd
 import json
 import os
 
-# Valid set abbreviations
-VALID_SETS = ['sor', 'shd', 'twi', 'jtl', 'lof', 'sec', 'law']
+# Main booster/premier-legal sets in release order
+MAIN_SETS = ['sor', 'shd', 'twi', 'jtl', 'lof', 'sec', 'law']
+
+# Supplemental product set codes
+SPECIAL_SETS = ['ts26']
+
+# Supported set abbreviations for card lookups
+VALID_SETS = MAIN_SETS + SPECIAL_SETS
+
+# Uppercase versions for scripts that work with SWUDB deck/set identifiers
+MAIN_SETS_UPPER = [set_name.upper() for set_name in MAIN_SETS]
+SPECIAL_SETS_UPPER = [set_name.upper() for set_name in SPECIAL_SETS]
+VALID_SETS_UPPER = [set_name.upper() for set_name in VALID_SETS]
 
 # Directory for cached card data
 CACHE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'card_data')

@@ -9,15 +9,14 @@ with CLI commands to add/remove decks and generate a markdown summary.
 import sys
 import os
 import sqlite3
-import json
 import argparse
 from datetime import datetime
 from urllib.parse import urlparse
 from collections import defaultdict
 import requests
+from lib.swudb import MAIN_SETS_UPPER, SPECIAL_SETS_UPPER
 
-# Main sets in chronological order - prefer these over promos
-MAIN_SETS = ['SOR', 'SHD', 'TWI', 'JTL', 'LOF', 'SEC']
+ORDERED_SETS = MAIN_SETS_UPPER + SPECIAL_SETS_UPPER
 
 # Database and output paths
 DB_PATH = os.path.join(os.path.dirname(__file__), 'card_data', 'cards_in_use.db')
@@ -100,8 +99,13 @@ def extract_deck_id(url):
 def select_primary_set(set_codes):
     """Select the primary set, preferring main sets over promos."""
     for set_abbr, num in set_codes:
-        if set_abbr in MAIN_SETS:
+        if set_abbr in MAIN_SETS_UPPER:
             return (set_abbr, num)
+
+    for set_abbr, num in set_codes:
+        if set_abbr in SPECIAL_SETS_UPPER:
+            return (set_abbr, num)
+
     return set_codes[0] if set_codes else (None, None)
 
 
@@ -336,7 +340,7 @@ def cmd_remove_all(conn):
     
     conn.commit()
     
-    print(f"Removed all data:")
+    print("Removed all data:")
     print(f"  Decks removed: {deck_count}")
     print(f"  Cards removed: {card_count}")
     
@@ -415,8 +419,8 @@ def cmd_export(conn):
     
     # Sort sets: main sets first in order, then others alphabetically
     all_sets = list(grouped.keys())
-    known_sets = [s for s in MAIN_SETS if s in all_sets]
-    unknown_sets = sorted([s for s in all_sets if s not in MAIN_SETS])
+    known_sets = [s for s in ORDERED_SETS if s in all_sets]
+    unknown_sets = sorted([s for s in all_sets if s not in ORDERED_SETS])
     ordered_sets = known_sets + unknown_sets
     
     for set_abbr in ordered_sets:

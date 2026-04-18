@@ -80,7 +80,7 @@ def update_list_names(card_list):
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    update_list_names("sec")
+    # update_list_names("sec")
 
     # Already Run
     # update_list_names('lof')
@@ -90,7 +90,7 @@ if __name__ == '__main__':
     # update_list_names('jtl')
 
     # Not yet released
-    # update_list_names('law')  # A Lawless Time - releases 2026-03-06
+    update_list_names('law')  # A Lawless Time - releases 2026-03-06
 
 
 

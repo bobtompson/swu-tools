@@ -5,9 +5,10 @@ import re
 from collections import defaultdict
 from urllib.parse import urlparse
 import requests
+from lib.swudb import MAIN_SETS_UPPER, SPECIAL_SETS_UPPER, VALID_SETS_UPPER
 
-# Main sets in chronological order - prefer these over promos
-MAIN_SETS = ['SOR', 'SHD', 'TWI', 'JTL', 'LOF', 'SEC']
+# Ordered sets for output. Main sets stay first; supplemental sets follow.
+ORDERED_SETS = MAIN_SETS_UPPER + SPECIAL_SETS_UPPER
 
 # Deck format mapping
 DECK_FORMATS = {
@@ -26,8 +27,7 @@ def get_card_name_from_api(set_abbr, card_num):
     """Look up card name from swudb API."""
     set_lower = set_abbr.lower()
 
-    # Only fetch from API for main sets
-    if set_abbr not in MAIN_SETS:
+    if set_abbr not in VALID_SETS_UPPER:
         return None
 
     # Check cache first
@@ -51,6 +51,50 @@ def get_card_name_from_api(set_abbr, card_num):
 
     # Look up the card
     return _set_cache.get(set_lower, {}).get(card_num)
+
+def merge_cards_by_printing(cards):
+    """Merge rows with the same (set, number); sum quantity; preserve first-seen order."""
+    buckets = {}
+    order = []
+    for card in cards:
+        key = (card['set'], card['number'])
+        qty = card.get('quantity', 1)
+        try:
+            qty = int(qty)
+        except (TypeError, ValueError):
+            qty = 1
+        if qty <= 0:
+            continue
+        if key not in buckets:
+            buckets[key] = {
+                'name': card['name'],
+                'set': card['set'],
+                'number': card['number'],
+                'alternates': list(card.get('alternates', [])),
+                'quantity': qty,
+            }
+            order.append(key)
+        else:
+            buckets[key]['quantity'] += qty
+            seen = set(buckets[key]['alternates'])
+            for alt in card.get('alternates', []):
+                if alt not in seen:
+                    buckets[key]['alternates'].append(alt)
+                    seen.add(alt)
+    return [buckets[k] for k in order]
+
+
+def item_quantity(item):
+    """Read quantity from a deck JSON item (count / quantity), default 1."""
+    for key in ('count', 'quantity'):
+        if key in item and item[key] is not None:
+            try:
+                q = int(item[key])
+                return max(q, 0)
+            except (TypeError, ValueError):
+                break
+    return 1
+
 
 def parse_picklist(filepath):
     """Parse a Picklist format file and return (cards, metadata)."""
@@ -85,7 +129,8 @@ def parse_picklist(filepath):
                             'name': name,
                             'set': primary_set,
                             'number': primary_num,
-                            'alternates': alternate_sets
+                            'alternates': alternate_sets,
+                            'quantity': 1,
                         })
                     i += 1  # Skip the set codes line
         i += 1
@@ -99,6 +144,9 @@ def parse_picklist(filepath):
         'second_leader': None,
         'base': None
     }
+
+    if metadata['format'] != 'Twin Suns':
+        cards = merge_cards_by_printing(cards)
 
     return cards, metadata
 
@@ -118,8 +166,14 @@ def select_primary_set(set_codes):
     """Select the primary set, preferring main sets over promos."""
     # First, look for a main set
     for set_abbr, num in set_codes:
-        if set_abbr in MAIN_SETS:
+        if set_abbr in MAIN_SETS_UPPER:
             return (set_abbr, num)
+
+    # Then prefer known supplemental product sets over promos
+    for set_abbr, num in set_codes:
+        if set_abbr in SPECIAL_SETS_UPPER:
+            return (set_abbr, num)
+
     # Fall back to first listed if no main set found
     return set_codes[0]
 
@@ -138,7 +192,8 @@ def parse_card_id(card_id):
             'name': name,
             'set': set_abbr,
             'number': num_padded,
-            'alternates': []
+            'alternates': [],
+            'quantity': 1,
         }
     return None
 
@@ -192,7 +247,14 @@ def parse_json(filepath):
                 continue
             card_info = parse_card_id(item['id'])
             if card_info:
-                cards.append(card_info)
+                q = item_quantity(item)
+                if q <= 0:
+                    continue
+                entry = {**card_info, 'quantity': q}
+                cards.append(entry)
+
+    if metadata['format'] != 'Twin Suns':
+        cards = merge_cards_by_printing(cards)
 
     return cards, metadata
 
@@ -233,7 +295,10 @@ def fetch_deck_from_url(url):
             return None, None
 
         data = response.json()
-        return parse_swudb_json(data, deck_id)
+        cards, metadata = parse_swudb_json(data, deck_id)
+        if metadata is not None:
+            metadata = {**metadata, 'source_url': url}
+        return cards, metadata
 
     except Exception as e:
         print(f"Error fetching deck: {e}")
@@ -261,16 +326,14 @@ def extract_card_info(card_data):
             'name': name,
             'set': set_abbr,
             'number': num,
-            'alternates': []
+            'alternates': [],
+            'quantity': 1,
         }
     return None
 
 
 def parse_swudb_json(data, deck_id):
     """Parse SWUDB JSON response to extract cards and deck metadata."""
-    cards = []
-
-    # Extract deck metadata
     deck_format_code = data.get('deckFormat', 1)
     metadata = {
         'title': data.get('deckName', deck_id),
@@ -281,21 +344,35 @@ def parse_swudb_json(data, deck_id):
         'base': extract_card_info(data.get('base'))
     }
 
-    # Add leader(s) and base to card list
-    if metadata['leader']:
-        cards.append(metadata['leader'].copy())
-    if metadata['second_leader']:
-        cards.append(metadata['second_leader'].copy())
-    if metadata['base']:
-        cards.append(metadata['base'].copy())
+    card_counts = {}
 
-    # Add main deck cards from shuffledDeck
+    def add_card(card_data, qty=1):
+        if not card_data or qty <= 0:
+            return
+        info = extract_card_info(card_data)
+        if not info:
+            return
+        key = (info['set'], info['number'])
+        if key in card_counts:
+            card_counts[key]['quantity'] += qty
+        else:
+            card_counts[key] = {**info, 'quantity': qty}
+
+    add_card(data.get('leader'), 1)
+    add_card(data.get('secondLeader'), 1)
+    add_card(data.get('base'), 1)
+
     for entry in data.get('shuffledDeck', []):
         card_data = entry.get('card')
-        card_info = extract_card_info(card_data)
-        if card_info:
-            cards.append(card_info)
+        if not card_data:
+            continue
+        main_count = entry.get('count', 0) or 0
+        sideboard_count = entry.get('sideboardCount', 0) or 0
+        total = main_count + sideboard_count
+        if total > 0:
+            add_card(card_data, total)
 
+    cards = list(card_counts.values())
     return cards, metadata
 
 
@@ -327,10 +404,13 @@ def format_header(metadata):
     lines.append(f"# {metadata['title']}")
     lines.append("")
 
-    # Format and Author on same line area
+    # Format, source URL (URL imports), and Author
     info_lines = []
     if metadata.get('format'):
         info_lines.append(f"**Format:** {metadata['format']}")
+    if metadata.get('source_url'):
+        src = metadata['source_url']
+        info_lines.append(f"**Source:** [{src}]({src})")
     if metadata.get('author'):
         info_lines.append(f"**Author:** {metadata['author']}")
 
@@ -367,17 +447,21 @@ def format_output(grouped, metadata=None):
 
     # Sort sets: main sets first in order, then promo/special sets alphabetically
     all_sets = list(grouped.keys())
-    known_sets = [s for s in MAIN_SETS if s in all_sets]
-    unknown_sets = sorted([s for s in all_sets if s not in MAIN_SETS])
+    known_sets = [s for s in ORDERED_SETS if s in all_sets]
+    unknown_sets = sorted([s for s in all_sets if s not in ORDERED_SETS])
     ordered_sets = known_sets + unknown_sets
+
+    show_qty_suffix = (metadata or {}).get('format') != 'Twin Suns'
 
     for set_abbr in ordered_sets:
         cards = grouped[set_abbr]
-        count = len(cards)
-        lines.append(f"\n## {set_abbr} ({count} CARDS)")
+        total_qty = sum(c.get('quantity', 1) for c in cards)
+        lines.append(f"\n## {set_abbr} ({total_qty} CARDS)")
 
         for card in cards:
             line = f"- {card['number']}: {card['name']}"
+            if show_qty_suffix and card.get('quantity', 1) > 1:
+                line += f" ×{card['quantity']}"
             if card['alternates']:
                 line += f" (also in: {', '.join(card['alternates'])})"
             lines.append(line)
