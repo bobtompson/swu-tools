@@ -62,6 +62,13 @@ def fetch_deck_from_url(url):
 
     api_url = f"https://www.swudb.com/api/deck/{deck_id}"
     response = requests.get(api_url, timeout=30)
+    if response.status_code == 404:
+        raise ValueError(
+            f"Deck not found at {api_url} (404). "
+            "If the deck page loads in a browser, it is likely set to Private — "
+            "the SWUDB API only serves Public or Unlisted decks. "
+            "Open the deck on swudb.com and change visibility to Unlisted."
+        )
     response.raise_for_status()
     return response.json()
 
@@ -254,11 +261,10 @@ def validate_twin_suns(deck):
 
     if leader_count == 2:
         leader_alignments = [extract_alignment(leader) for leader in deck["leaders"]]
-        if None in leader_alignments:
-            reasons.append("Could not determine Heroism/Villainy alignment for both leaders.")
-        elif leader_alignments[0] != leader_alignments[1]:
+        explicit = [a for a in leader_alignments if a is not None]
+        if len(explicit) == 2 and explicit[0] != explicit[1]:
             reasons.append(
-                "Twin Suns leaders must share the same Heroism/Villainy alignment on their front side."
+                "Twin Suns leaders must not mix Heroism and Villainy on their front side."
             )
 
     copies_by_card = Counter()

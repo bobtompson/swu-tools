@@ -21,6 +21,9 @@ Note: If you are not sure how to do this. ChatGPT generated a step by step how-t
 - `sort_deck_by_set.py` Takes a deck list and outputs cards sorted by set. Useful for gathering cards from binders organized by set.
 - `update_used_card_list.py` Tracks all cards in use across multiple SWUDB decks. Maintains a SQLite database and exports a markdown summary.
 - `validate_deck_format.py` Fetches a SWUDB deck, detects whether it is Premier-style or Twin Suns, and reports legality for Premier, Eternal, and Twin Suns.
+- `trilogy_validator.py` Validates three SWU decks together as a Premier Trilogy or Twin Suns Trilogy Gauntlet build (distinct leaders/bases + combined-copy limit).
+- `deck_diff.py` Shows a GitHub-style diff of two decks (added / removed cards) for deckbuilding iteration.
+- `./lib/deck_source.py` Unified loader that returns a normalized deck from a SWUDB URL, `.json`, `.txt` picklist, or sorted `.md` file.
 
 ## Deck Sorting Tool
 The `sort_deck_by_set.py` script helps gather cards for a deck from set-organized binders.
@@ -108,6 +111,41 @@ uv run python validate_deck_format.py "https://swudb.com/deck/KRvnhNGlV"
 **Current limitations:**
 - Reprint legality is currently resolved by full printed card name from the sourced card data
 - Premier suspension checks are the only suspension checks currently applied
+
+## Trilogy Validator
+
+The `trilogy_validator.py` script validates three SWU decks together as a Trilogy build. It auto-detects whether the three decks are Premier-style (3-copy combined limit) or Twin Suns (1-copy combined limit, the unofficial *Twin Suns Trilogy Gauntlet* community format).
+
+**Usage:**
+```bash
+uv run python trilogy_validator.py <deck1> <deck2> <deck3>
+```
+
+Each `<deck>` may be a SWUDB URL, a `.json` deck export, a `.txt` picklist, or a sorted `.md` file produced by `sort_deck_by_set.py`.
+
+**Checks per deck:** runs the existing Premier or Twin Suns validation. When the source isn't a URL, aspect / `alternativeDeckMaximum` / suspended-name checks are skipped (with a printed note).
+
+**Cross-deck checks:**
+- All leaders distinct across the three decks (no leader may repeat in any slot).
+- All three bases distinct.
+- Combined-copy limit: 3 for Premier Trilogy, 1 for Twin Suns Trilogy Gauntlet.
+
+**Search a deck list (`--lists FILE`):**
+```bash
+uv run python trilogy_validator.py --lists swudb_lists/twin_suns_lists.md
+```
+Pass a markdown file with `- [Name](URL)` lines (one deck per bullet) and the validator searches every combination of 3 for a valid Trilogy. If none qualify, it reports the closest combination — the one with no duplicate leaders/bases and the fewest cards over the combined-copy limit — and prints the specific shared cards.
+
+## Deck Diff
+
+The `deck_diff.py` script prints a GitHub-style diff between two decks — useful when iterating on a list and you want to know exactly which cards to pull and which to add.
+
+**Usage:**
+```bash
+uv run python deck_diff.py <old_deck> <new_deck>
+```
+
+Each argument may be a SWUDB URL, `.json`, `.txt`, or sorted `.md` file. Cards are matched by `(set, number)`, so a reprint swap (same name, different set) reads as one removal + one addition. Sections covered: leaders, base, main deck, sideboard. Sideboard is folded into the main deck for the diff when either source is a non-URL file (because picklist/markdown formats don't carry sideboard separately).
 
 ## Google Sheet Inventory
 How I set up my inventory. I set up my functions in `main.py` with this format in mind.

@@ -290,6 +290,14 @@ def fetch_deck_from_url(url):
 
     try:
         response = requests.get(api_url, timeout=30)
+        if response.status_code == 404:
+            print(f"Error: Deck not found at {api_url} (404).")
+            print(
+                "  Hint: if the deck page loads in a browser, it is likely set to Private. "
+                "The SWUDB API only serves Public or Unlisted decks — "
+                "open the deck on swudb.com and change visibility to Unlisted."
+            )
+            return None, None
         if response.status_code != 200:
             print(f"Error: Failed to fetch deck (status {response.status_code})")
             return None, None
