@@ -11,10 +11,11 @@ import os
 import sqlite3
 import argparse
 from datetime import datetime
-from urllib.parse import urlparse
 from collections import defaultdict
 import requests
 from lib.swudb import MAIN_SETS_UPPER, SPECIAL_SETS_UPPER
+from lib.deck_source import card_identity, load_deck
+import validate_deck_format as vdf
 
 ORDERED_SETS = MAIN_SETS_UPPER + SPECIAL_SETS_UPPER
 
@@ -32,11 +33,15 @@ DECK_FORMATS = {
 def init_db():
     """Initialize the SQLite database with required tables."""
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    
+
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    
+
+    # SQLite ships with foreign-key enforcement off; without this the
+    # ON DELETE CASCADE on deck_cards never fires and orphan rows accumulate.
+    cursor.execute('PRAGMA foreign_keys = ON')
+
     # Create decks table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS decks (
@@ -78,137 +83,65 @@ def init_db():
     return conn
 
 
-def is_swudb_url(input_str):
-    """Check if input is a SWUDB deck URL."""
-    try:
-        parsed = urlparse(input_str)
-        return parsed.netloc in ('swudb.com', 'www.swudb.com') and '/deck/' in parsed.path
-    except Exception:
-        return False
+def _summarize_deck(deck, url):
+    """Flatten a normalized deck (lib.deck_source) into the legacy SQLite shape.
 
+    Returns {deck_id, title, url, format, cards} where cards is a list of
+    {name, set, number, quantity} merged across leaders / base / mainboard / sideboard.
+    """
+    counts = {}
 
-def extract_deck_id(url):
-    """Extract deck ID from SWUDB URL."""
-    parsed = urlparse(url)
-    path_parts = parsed.path.strip('/').split('/')
-    if len(path_parts) >= 2 and path_parts[0] == 'deck':
-        return path_parts[1]
-    return None
-
-
-def select_primary_set(set_codes):
-    """Select the primary set, preferring main sets over promos."""
-    for set_abbr, num in set_codes:
-        if set_abbr in MAIN_SETS_UPPER:
-            return (set_abbr, num)
-
-    for set_abbr, num in set_codes:
-        if set_abbr in SPECIAL_SETS_UPPER:
-            return (set_abbr, num)
-
-    return set_codes[0] if set_codes else (None, None)
-
-
-def format_card_name(card_data):
-    """Format card name with title if present."""
-    name = card_data.get('cardName', '')
-    title = card_data.get('title', '')
-    if title:
-        return f"{name} - {title}"
-    return name
-
-
-def fetch_deck_from_url(url):
-    """Fetch deck data from SWUDB URL and return deck info and cards."""
-    deck_id = extract_deck_id(url)
-    if not deck_id:
-        print(f"Error: Could not extract deck ID from URL: {url}")
-        return None
-    
-    api_url = f"https://www.swudb.com/api/deck/{deck_id}"
-    print(f"Fetching deck from: {api_url}")
-    
-    try:
-        response = requests.get(api_url, timeout=30)
-        if response.status_code == 404:
-            print(f"Error: Deck not found at {api_url} (404).")
-            print(
-                "  Hint: if the deck page loads in a browser, it is likely set to Private. "
-                "The SWUDB API only serves Public or Unlisted decks — "
-                "open the deck on swudb.com and change visibility to Unlisted."
-            )
-            return None
-        if response.status_code != 200:
-            print(f"Error: Failed to fetch deck (status {response.status_code})")
-            return None
-
-        data = response.json()
-        return parse_swudb_response(data, deck_id, url)
-    
-    except Exception as e:
-        print(f"Error fetching deck: {e}")
-        return None
-
-
-def parse_swudb_response(data, deck_id, url):
-    """Parse SWUDB API response to extract deck info and cards with quantities."""
-    deck_name = data.get('deckName', deck_id)
-    deck_format_code = data.get('deckFormat', 1)
-    deck_format = DECK_FORMATS.get(deck_format_code, 'Unknown')
-    
-    # Use dict to track quantities: key = (set, number), value = {card_data, quantity}
-    card_counts = {}
-    
-    def add_card(card_data, qty=1):
-        if not card_data:
+    def add(card_data, qty):
+        if not card_data or qty <= 0:
             return
-        name = format_card_name(card_data)
-        set_abbr = card_data.get('defaultExpansionAbbreviation', '')
-        num = card_data.get('defaultCardNumber', '').zfill(3)
-        if name and set_abbr:
-            key = (set_abbr, num)
-            if key in card_counts:
-                card_counts[key]['quantity'] += qty
-            else:
-                card_counts[key] = {
-                    'name': name,
-                    'set': set_abbr,
-                    'number': num,
-                    'quantity': qty
-                }
-    
-    # Add leader(s) and base (always quantity 1)
-    add_card(data.get('leader'), 1)
-    add_card(data.get('secondLeader'), 1)
-    add_card(data.get('base'), 1)
-    
-    # Add main deck and sideboard cards
-    for entry in data.get('shuffledDeck', []):
-        card_data = entry.get('card')
-        if card_data:
-            main_count = entry.get('count', 0)
-            sideboard_count = entry.get('sideboardCount', 0)
-            total_count = main_count + sideboard_count
-            if total_count > 0:
-                add_card(card_data, total_count)
-    
+        name = vdf.format_card_name(card_data)
+        set_abbr, number = card_identity(card_data)
+        if not (name and set_abbr and number):
+            return
+        key = (set_abbr, number)
+        if key in counts:
+            counts[key]['quantity'] += qty
+        else:
+            counts[key] = {
+                'name': name,
+                'set': set_abbr,
+                'number': number,
+                'quantity': qty,
+            }
+
+    for leader in deck['leaders']:
+        add(leader, 1)
+    add(deck['base'], 1)
+    for entry in deck['mainboard']:
+        add(entry['card'], entry['quantity'])
+    for entry in deck['sideboard']:
+        add(entry['card'], entry['quantity'])
+
     return {
-        'deck_id': deck_id,
-        'title': deck_name,
+        'deck_id': vdf.extract_deck_id(url),
+        'title': deck['title'],
         'url': url,
-        'format': deck_format,
-        'cards': list(card_counts.values())
+        'format': DECK_FORMATS.get(deck['deck_format_code'], 'Unknown'),
+        'cards': list(counts.values()),
     }
 
 
 def cmd_add(conn, url):
     """Add a deck to tracking."""
-    if not is_swudb_url(url):
+    if not vdf.is_swudb_url(url):
         print(f"Error: Invalid SWUDB URL: {url}")
         return False
-    
-    deck_data = fetch_deck_from_url(url)
-    if not deck_data:
+
+    print(f"Fetching deck from: https://www.swudb.com/api/deck/{vdf.extract_deck_id(url)}")
+    try:
+        deck = load_deck(url)
+    except (requests.RequestException, ValueError) as exc:
+        print(f"Error: {exc}")
+        return False
+
+    deck_data = _summarize_deck(deck, url)
+    if not deck_data['deck_id']:
+        print(f"Error: Could not extract deck ID from URL: {url}")
         return False
     
     cursor = conn.cursor()
@@ -276,7 +209,7 @@ def cmd_add(conn, url):
 
 def cmd_remove(conn, url):
     """Remove a deck from tracking."""
-    deck_id = extract_deck_id(url)
+    deck_id = vdf.extract_deck_id(url)
     if not deck_id:
         print(f"Error: Could not extract deck ID from URL: {url}")
         return False

@@ -156,11 +156,26 @@ def _check_combined_copies(decks, limit):
     return reasons
 
 
+def _deck_size_summary(deck):
+    """Return e.g. '81 Cards + 2 Leaders + 1 Base' for the detected: line."""
+    main_count = sum(entry["quantity"] for entry in deck["mainboard"])
+    side_count = sum(entry["quantity"] for entry in deck["sideboard"])
+    leader_count = len(deck["leaders"])
+    base_count = 1 if deck.get("base") else 0
+
+    parts = [f"{main_count} Cards"]
+    if side_count:
+        parts.append(f"{side_count} Sideboard")
+    parts.append(f"{leader_count} Leader{'s' if leader_count != 1 else ''}")
+    parts.append(f"{base_count} Base")
+    return " + ".join(parts)
+
+
 def _print_deck_section(index, deck, deck_type, reasons, notes):
     title = deck.get("title") or f"Deck {index + 1}"
     print(f"## Deck {index + 1}: {title}")
     print(f"   source: {deck.get('source', '')}")
-    print(f"   detected: {deck_type}")
+    print(f"   detected: {deck_type} ({_deck_size_summary(deck)})")
     for note in notes:
         print(f"   note: {note}")
     vdf.print_status(f"   {deck_type}", reasons)

@@ -8,20 +8,9 @@ and minimal card stubs (no aspects / no ``alternativeDeckMaximum``).
 
 import os
 import re
-from urllib.parse import urlparse
-
-import requests
 
 from sort_deck_by_set import parse_picklist, parse_json
 import validate_deck_format as vdf
-
-
-def is_swudb_url(source):
-    try:
-        parsed = urlparse(source)
-        return parsed.netloc in ("swudb.com", "www.swudb.com") and "/deck/" in parsed.path
-    except Exception:
-        return False
 
 
 def _identity(card_info):
@@ -255,7 +244,7 @@ def _from_markdown(source):
 
 def load_deck(source):
     """Load a deck from a SWUDB URL, .json, .txt picklist, or sorted .md file."""
-    if is_swudb_url(source):
+    if vdf.is_swudb_url(source):
         return _from_url(source)
 
     if not os.path.exists(source):
@@ -288,8 +277,3 @@ def card_identity(card_data):
     number = card_data.get("defaultCardNumber") or card_data.get("number") or ""
     number = str(number).zfill(3) if number != "" else ""
     return (set_abbr, number)
-
-
-def fetch_url_deck(url):
-    """Convenience passthrough for callers that want to handle errors directly."""
-    return requests.get(url, timeout=30).json()

@@ -3,9 +3,9 @@ import os
 import json
 import re
 from collections import defaultdict
-from urllib.parse import urlparse
 import requests
 from lib.swudb import MAIN_SETS_UPPER, SPECIAL_SETS_UPPER, VALID_SETS_UPPER
+import validate_deck_format as vdf
 
 # Ordered sets for output. Main sets stay first; supplemental sets follow.
 ORDERED_SETS = MAIN_SETS_UPPER + SPECIAL_SETS_UPPER
@@ -259,28 +259,9 @@ def parse_json(filepath):
     return cards, metadata
 
 
-def is_swudb_url(input_str):
-    """Check if input is a SWUDB deck URL."""
-    try:
-        parsed = urlparse(input_str)
-        return parsed.netloc in ('swudb.com', 'www.swudb.com') and '/deck/' in parsed.path
-    except Exception:
-        return False
-
-
-def extract_deck_id(url):
-    """Extract deck ID from SWUDB URL."""
-    # URL format: https://www.swudb.com/deck/RawKbHItN
-    parsed = urlparse(url)
-    path_parts = parsed.path.strip('/').split('/')
-    if len(path_parts) >= 2 and path_parts[0] == 'deck':
-        return path_parts[1]
-    return None
-
-
 def fetch_deck_from_url(url):
     """Fetch deck data from SWUDB URL and return (cards, metadata)."""
-    deck_id = extract_deck_id(url)
+    deck_id = vdf.extract_deck_id(url)
     if not deck_id:
         print(f"Error: Could not extract deck ID from URL: {url}")
         return None, None
@@ -289,44 +270,22 @@ def fetch_deck_from_url(url):
     print(f"Fetching deck from: {api_url}")
 
     try:
-        response = requests.get(api_url, timeout=30)
-        if response.status_code == 404:
-            print(f"Error: Deck not found at {api_url} (404).")
-            print(
-                "  Hint: if the deck page loads in a browser, it is likely set to Private. "
-                "The SWUDB API only serves Public or Unlisted decks — "
-                "open the deck on swudb.com and change visibility to Unlisted."
-            )
-            return None, None
-        if response.status_code != 200:
-            print(f"Error: Failed to fetch deck (status {response.status_code})")
-            return None, None
-
-        data = response.json()
-        cards, metadata = parse_swudb_json(data, deck_id)
-        if metadata is not None:
-            metadata = {**metadata, 'source_url': url}
-        return cards, metadata
-
-    except Exception as e:
-        print(f"Error fetching deck: {e}")
+        data = vdf.fetch_deck_from_url(url)
+    except (requests.RequestException, ValueError) as exc:
+        print(f"Error: {exc}")
         return None, None
 
-
-def format_card_name(card_data):
-    """Format card name with title if present."""
-    name = card_data.get('cardName', '')
-    title = card_data.get('title', '')
-    if title:
-        return f"{name} - {title}"
-    return name
+    cards, metadata = parse_swudb_json(data, deck_id)
+    if metadata is not None:
+        metadata = {**metadata, 'source_url': url}
+    return cards, metadata
 
 
 def extract_card_info(card_data):
     """Extract card info dict from SWUDB card data."""
     if not card_data:
         return None
-    name = format_card_name(card_data)
+    name = vdf.format_card_name(card_data)
     set_abbr = card_data.get('defaultExpansionAbbreviation', '')
     num = card_data.get('defaultCardNumber', '').zfill(3)
     if name and set_abbr:
@@ -521,7 +480,7 @@ def main():
     output_dir = sys.argv[2] if len(sys.argv) > 2 else None
 
     # Check if input is a URL
-    if is_swudb_url(input_arg):
+    if vdf.is_swudb_url(input_arg):
         cards, metadata = fetch_deck_from_url(input_arg)
         if not cards:
             print("No cards found from URL.")
