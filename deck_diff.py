@@ -10,9 +10,12 @@ picklists, or sorted .md files produced by sort_deck_by_set.py.
 import argparse
 
 import requests
+from rich.console import Console
 
 import validate_deck_format as vdf
 from lib.deck_source import card_identity, load_deck
+
+console = Console()
 
 
 def _section_map(entries):
@@ -82,10 +85,11 @@ def _diff_section(old_map, new_map):
 def _print_section(title, lines):
     if not lines:
         return
-    print(f"## {title}")
+    console.print(f"[bold]## {title}[/bold]")
     for sign, qty, label in lines:
-        print(f"{sign} {qty}x {label}")
-    print()
+        color = "green" if sign == "+" else "red"
+        console.print(f"[{color}]{sign} {qty}x {label}[/{color}]")
+    console.print()
 
 
 def main():
@@ -100,13 +104,17 @@ def main():
         old_deck = load_deck(args.old)
         new_deck = load_deck(args.new)
     except (requests.RequestException, ValueError) as exc:
-        print(f"Error loading deck: {exc}")
+        console.print(f"[red]Error loading deck: {exc}[/red]")
         raise SystemExit(1) from exc
 
-    print(f"# Deck Diff: {old_deck.get('title', args.old)} → {new_deck.get('title', args.new)}")
-    print(f"  old: {old_deck.get('source', args.old)}")
-    print(f"  new: {new_deck.get('source', args.new)}")
-    print()
+    console.print(
+        f"[bold]# Deck Diff:[/bold] "
+        f"[red]{old_deck.get('title', args.old)}[/red] → "
+        f"[green]{new_deck.get('title', args.new)}[/green]"
+    )
+    console.print(f"  [red]old:[/red] {old_deck.get('source', args.old)}")
+    console.print(f"  [green]new:[/green] {new_deck.get('source', args.new)}")
+    console.print()
 
     sections = [
         ("Leaders", _leaders_map(old_deck["leaders"]), _leaders_map(new_deck["leaders"])),
@@ -150,10 +158,10 @@ def main():
         total_removed += removed
 
     if not any_changes:
-        print("No changes between decks.")
+        console.print("No changes between decks.")
         return
 
-    print(f"Summary: +{total_added}, -{total_removed}")
+    console.print(f"Summary: [green]+{total_added}[/green], [red]-{total_removed}[/red]")
 
 
 if __name__ == "__main__":
