@@ -132,11 +132,17 @@ Each `<deck>` may be a SWUDB URL, a `.json` deck export, a `.txt` picklist, or a
 - All three bases distinct.
 - Combined-copy limit: 3 for Premier Trilogy, 1 for Twin Suns Trilogy Gauntlet.
 
-**Search a deck list (`--lists FILE`):**
+**Search a plain text deck list (`--lists FILE`):**
 ```bash
-uv run python trilogy_validator.py --lists swudb_lists/twin_suns_lists.md
+uv run python trilogy_validator.py --lists swudb_lists/twin_suns_lists.txt
 ```
-Pass a markdown file with `- [Name](URL)` lines (one deck per bullet) and the validator searches every combination of 3 for a valid Trilogy. If none qualify, it reports the closest combination — the one with no duplicate leaders/bases and the fewest cards over the combined-copy limit — and prints the specific shared cards.
+Pass a plain text file with one deck source per line. Blank lines and `#` comments are ignored. Each source may be a SWUDB URL, `.json`, `.txt`, or sorted `.md` deck file.
+
+**Search a markdown deck list (`--mdlists FILE`):**
+```bash
+uv run python trilogy_validator.py --mdlists swudb_lists/twin_suns_lists.md
+```
+Pass a markdown file with `- [Name](URL)` lines (one deck per bullet). In both list modes, the validator searches every combination of 3 for a valid Trilogy. If none qualify, it reports the closest combination — the one with no duplicate leaders/bases and the fewest cards over the combined-copy limit — and prints the specific shared cards.
 
 ## Deck Diff
 

@@ -227,7 +227,7 @@ def _emit_full_report(decks, deck_type, premier_reprint_names, limit, label):
     return invalid
 
 
-def _parse_lists_file(filepath):
+def _parse_markdown_lists_file(filepath):
     """Extract (name, url) entries from a markdown link list, deduped by URL."""
     entries = []
     seen = set()
@@ -246,14 +246,30 @@ def _parse_lists_file(filepath):
     return entries
 
 
+def _parse_plain_lists_file(filepath):
+    """Extract deck sources from a plain text file, one source per line."""
+    entries = []
+    seen = set()
+    with open(filepath, encoding="utf-8") as f:
+        for line_number, line in enumerate(f, start=1):
+            source = line.strip()
+            if not source or source.startswith("#"):
+                continue
+            if source in seen:
+                continue
+            seen.add(source)
+            entries.append((f"Line {line_number}", source))
+    return entries
+
+
 def _load_decks_from_entries(entries):
     """Fetch every deck in the list, reporting failures inline."""
     decks = []
-    for name, url in entries:
+    for name, source in entries:
         try:
-            deck = load_deck(url)
+            deck = load_deck(source)
         except (requests.RequestException, ValueError) as exc:
-            print(f"  ! could not load {name} ({url}): {exc}")
+            print(f"  ! could not load {name} ({source}): {exc}")
             continue
         deck.setdefault("title", name)
         decks.append(deck)
@@ -298,13 +314,13 @@ def _find_best_trilogy(decks, limit):
     return best_cost, best_combo
 
 
-def _run_lists(filepath):
-    entries = _parse_lists_file(filepath)
+def _run_list_search(filepath, entries, source_description):
     if not entries:
-        print(f"No deck links found in {filepath}.")
+        print(f"No deck sources found in {filepath}.")
         raise SystemExit(1)
 
     print(f"# Trilogy Search: {filepath}")
+    print(f"Source format: {source_description}")
     print(f"Loading {len(entries)} decks...")
     decks = _load_decks_from_entries(entries)
     if len(decks) < 3:
@@ -378,6 +394,16 @@ def _run_lists(filepath):
     raise SystemExit(1 if invalid else 0)
 
 
+def _run_lists(filepath):
+    entries = _parse_plain_lists_file(filepath)
+    _run_list_search(filepath, entries, "plain text, one deck source per line")
+
+
+def _run_markdown_lists(filepath):
+    entries = _parse_markdown_lists_file(filepath)
+    _run_list_search(filepath, entries, "markdown links, `- [Name](URL)` per line")
+
+
 def _run_three(sources):
     decks = []
     for src in sources:
@@ -422,23 +448,35 @@ def main():
         "sources",
         nargs="*",
         help="Three deck sources (SWUDB URL or path to .json/.txt/.md). "
-        "Omit when using --lists.",
+        "Omit when using --lists or --mdlists.",
     )
     parser.add_argument(
         "--lists",
+        metavar="FILE",
+        help="Plain text file with one deck source per line; finds the best "
+        "Trilogy combination from the listed decks.",
+    )
+    parser.add_argument(
+        "--mdlists",
         metavar="FILE",
         help="Markdown file with `- [Name](URL)` lines; finds the best "
         "Trilogy combination from the listed decks.",
     )
     args = parser.parse_args()
 
-    if args.lists and args.sources:
-        parser.error("Cannot combine --lists with positional sources.")
+    list_args = [flag for flag in (args.lists, args.mdlists) if flag]
+    if len(list_args) > 1:
+        parser.error("Use only one of --lists or --mdlists.")
+    if list_args and args.sources:
+        parser.error("Cannot combine list-file arguments with positional sources.")
     if args.lists:
         _run_lists(args.lists)
         return
+    if args.mdlists:
+        _run_markdown_lists(args.mdlists)
+        return
     if len(args.sources) != 3:
-        parser.error("Provide exactly 3 sources, or use --lists FILE.")
+        parser.error("Provide exactly 3 sources, or use --lists FILE or --mdlists FILE.")
     _run_three(args.sources)
 
 
