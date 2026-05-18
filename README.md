@@ -23,6 +23,7 @@ Note: If you are not sure how to do this. ChatGPT generated a step by step how-t
 - `validate_deck_format.py` Fetches a SWUDB deck, detects whether it is Premier-style or Twin Suns, and reports legality for Premier, Eternal, and Twin Suns.
 - `trilogy_validator.py` Validates three SWU decks together as a Premier Trilogy or Twin Suns Trilogy Gauntlet build (distinct leaders/bases + combined-copy limit).
 - `deck_diff.py` Shows a GitHub-style diff of two decks (added / removed cards) for deckbuilding iteration.
+- `refresh_cache.py` Downloads / refreshes `card_data/` from the SWUDB API. Run with no arguments to refresh every known set, or pass set abbreviations (e.g. `law ts26`) to refresh specific ones. Use `--list` to see main sets + cache dates (warns when a new main release appears in the API but isn't in `VALID_SETS`), or `--list-all` to include promo / OP / convention sets.
 - `./lib/deck_source.py` Unified loader that returns a normalized deck from a SWUDB URL, `.json`, `.txt` picklist, or sorted `.md` file.
 
 **Note on private decks:** The SWUDB deck API only serves **Public** or **Unlisted** decks. A Private deck still renders in the browser but returns 404 from the API. Every deck-fetching script (`sort_deck_by_set.py`, `update_used_card_list.py`, `validate_deck_format.py`, `trilogy_validator.py`, `deck_diff.py`) prints a hint suggesting you change visibility to Unlisted when it sees a 404.
@@ -107,8 +108,7 @@ uv run python validate_deck_format.py "https://swudb.com/deck/KRvnhNGlV"
 - Detects whether the submitted deck is `Premier-style constructed` or `Twin Suns`
 - Reports `VALID` or `INVALID` for Premier, Eternal, and Twin Suns
 - Explains why a deck fails a format check
-- Applies Premier rotation for `SOR`, `SHD`, and `TWI` starting with `LAW`
-- Treats `TS26` as legal in Eternal and Twin Suns, but not Premier
+- Uses the centralized format-legality model in `lib/swudb.py`: current Premier rotation, pre-release auto-flip for pending sets, promo / OP / prerelease parent inheritance, and the Premier-suspended card list. See **Maintaining set and format legality** below for how to update these as sets release or rotate.
 
 **Current limitations:**
 - Reprint legality is currently resolved by full printed card name from the sourced card data
@@ -167,7 +167,53 @@ How I set up my inventory. I set up my functions in `main.py` with this format i
 - The google api only supports so many actions per minute, so if you want to add and retrieve data from your sheet keep that in mind. This is why I gather a list data struct and push the whole list to the sheet at once when updating the rename column.
 - When I run this to update card names I will do one set list at a time to make sure I do not hit the google actions limit.
 
-## Set Notes
-- Main release-set order in the tools is `SOR`, `SHD`, `TWI`, `JTL`, `LOF`, `SEC`, `LAW`.
-- The upcoming Twin Suns 2026 deck cards use official set code `TS26`.
-- `TS26` is treated as a supported supplemental set code in deck sorting and cards-in-use tooling, and sorts after the main release sets.
+## Maintaining set and format legality
+
+All set lists and format-legality rules live in **`lib/swudb.py`**. The `refresh_cache.py --list` command surfaces what needs updating with `⚠` warnings at the bottom of its output.
+
+### Configuration knobs
+
+Six constants you'll edit over time, all near the top of `lib/swudb.py`:
+
+```python
+MAIN_SETS               = ['sor', 'shd', 'twi', 'jtl', 'lof', 'ibh', 'sec', 'law']
+SPECIAL_SETS            = ['ts26']
+PREMIER_LEGAL_MAIN_SETS = {"JTL", "LOF", "IBH", "SEC", "LAW"}
+PREMIER_PENDING_SETS    = {"ASH"}        # auto-flips Premier-legal at release - 7 days
+PREMIER_ROTATED_SETS    = {"SOR", "SHD", "TWI"}
+PREMIER_EXCLUDED_SETS   = {"TS26"}       # main-class but never Premier-legal
+PREMIER_SUSPENDED_CARDS = {...}          # card-name bans, independent of set legality
+```
+
+Everything else — Eternal and Twin Suns legality (currently no rotation or bans), promo / OP / prerelease parent inheritance, and the pre-release auto-flip — is derived automatically by `set_legality()` from the `/sets` API catalog and today's date.
+
+`MAIN_SETS` / `SPECIAL_SETS` lowercase entries drive cache file naming and the `VALID_SETS` allowlist used by `refresh_cache.py`. The four `PREMIER_*` sets drive what `validate_deck_format.py` accepts.
+
+### Common scenarios
+
+**A new main set gets announced (e.g., Home Worlds).** Wait until the set ID appears in the SWUDB API (`refresh_cache.py --list` will warn "Main-class set(s) not in VALID_SETS"). Then:
+1. Add the lowercase set ID to `MAIN_SETS` in release-date order.
+2. Add the uppercase ID to `PREMIER_PENDING_SETS`.
+
+**A pending set passes its pre-release threshold (e.g., `ASH` on 2026-07-20).** No action required — `set_legality()` auto-flips it Premier-legal. As a one-line cleanup, move the ID from `PREMIER_PENDING_SETS` to `PREMIER_LEGAL_MAIN_SETS` so the data matches reality.
+
+**A set rotates out of Premier.** Move the ID from `PREMIER_LEGAL_MAIN_SETS` to `PREMIER_ROTATED_SETS`. Cards from that set still pass Premier validation if their name appears in any set still in `PREMIER_LEGAL_MAIN_SETS` (the reprint rule).
+
+**A reprint set drops (speculated *Icons*).** Add its ID to both `MAIN_SETS` and `PREMIER_LEGAL_MAIN_SETS`. The reprint-name logic in `validate_deck_format.py` automatically re-enables any same-named rotated cards in Premier.
+
+**A supplemental set is Twin-Suns / Eternal only (like `TS26`).** Add the lowercase ID to `SPECIAL_SETS` and the uppercase ID to `PREMIER_EXCLUDED_SETS`.
+
+**Promo / OP / prerelease sets (`JTLOP`, `LAWOP`, `P26`, etc.).** No action needed. `set_legality()` follows `parentSetId` from `/sets` and inherits the parent's Premier legality automatically.
+
+**Cards get suspended or unsuspended in Premier.** Edit `PREMIER_SUSPENDED_CARDS` in `lib/swudb.py`.
+
+### Sanity-checking your changes
+
+```bash
+uv run python refresh_cache.py --list
+```
+
+The output's `prem` / `etrn` / `TS` columns show current per-set legality. `*` marks pending sets (with the flip date in the fullName column); `(rotated)` annotates rotated sets. Warnings at the bottom surface:
+- Main-class sets newly visible in `/sets` but not in `VALID_SETS`
+- Sets in `VALID_SETS` without any `PREMIER_*` assignment
+- Local cache files for sets the API no longer recognizes

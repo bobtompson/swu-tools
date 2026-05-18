@@ -16,23 +16,20 @@ DECK_FORMATS = {
     2: "Twin Suns",
 }
 
-ROTATED_PREMIER_SETS = {"SOR", "SHD", "TWI"}
-PREMIER_LEGAL_MAIN_SETS = {"JTL", "LOF", "SEC", "LAW"}
-TWIN_SUNS_2026_SET = "TS26"
+# Format-legality constants and rules live in lib/swudb.py — single source of
+# truth for set lists, rotation, pre-release flips, and suspensions.
+from lib.swudb import (  # noqa: E402
+    PREMIER_LEGAL_MAIN_SETS,
+    PREMIER_SUSPENDED_CARDS,
+    get_sets_catalog,
+    set_legality,
+)
 
 HEROISM_ASPECT_ID = 5
 VILLAINY_ASPECT_ID = 6
 ALIGNMENT_ASPECT_IDS = {
     HEROISM_ASPECT_ID: "Heroism",
     VILLAINY_ASPECT_ID: "Villainy",
-}
-
-PREMIER_SUSPENDED_CARDS = {
-    "Boba Fett - Collecting the Bounty",
-    "Triple Dark Raid",
-    "Jango Fett - Concealing the Conspiracy",
-    "DJ - Blatant Thief",
-    "Force Throw",
 }
 
 
@@ -215,9 +212,20 @@ def validate_constructed_structure(deck, max_copies):
     return reasons
 
 
-def validate_premier(deck, premier_reprint_names):
-    """Validate Premier legality."""
+def validate_premier(deck, premier_reprint_names, catalog=None):
+    """Validate Premier legality.
+
+    For each printing, checks:
+      - card-name bans (PREMIER_SUSPENDED_CARDS)
+      - the printing's set legality via set_legality() (which handles
+        promo/OP-set parent inheritance, rotation, exclusion, and the
+        pre-release auto-flip)
+      - reprint-by-name fallback so a card printed in a non-legal set still
+        passes if it also exists in any Premier-legal main set
+    """
     reasons = validate_constructed_structure(deck, max_copies=3)
+    if catalog is None:
+        catalog = get_sets_catalog()
 
     for entry in deck["mainboard"] + deck["sideboard"]:
         card = entry["card"]
@@ -227,14 +235,22 @@ def validate_premier(deck, premier_reprint_names):
 
         if name in PREMIER_SUSPENDED_CARDS:
             reasons.append(f"{card_printing_label(card)} is suspended in Premier.")
+            continue
 
-        if set_abbr == TWIN_SUNS_2026_SET:
-            reasons.append(f"{card_printing_label(card)} is from {TWIN_SUNS_2026_SET}, which is not Premier legal.")
+        # The printing itself is Premier-legal — accept and move on. This also
+        # auto-accepts promo / OP / prerelease printings whose parent set is legal.
+        if set_legality(set_abbr, catalog)["premier"]:
+            continue
 
-        if set_abbr in ROTATED_PREMIER_SETS and lower_name not in premier_reprint_names:
-            reasons.append(
-                f"{card_printing_label(card)} is only from a rotated set and has no sourced Premier-legal reprint."
-            )
+        # Non-legal printing. Allow it through only if the card name is sourced
+        # from a Premier-legal main set (the reprint rule).
+        if lower_name in premier_reprint_names:
+            continue
+
+        reasons.append(
+            f"{card_printing_label(card)} is from {set_abbr}, which is not "
+            f"Premier-legal, and the card has no sourced Premier-legal reprint."
+        )
 
     return dedupe_reasons(reasons)
 
