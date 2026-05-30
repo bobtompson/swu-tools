@@ -24,6 +24,8 @@ Note: If you are not sure how to do this. ChatGPT generated a step by step how-t
 - `trilogy_validator.py` Validates three SWU decks together as a Premier Trilogy or Twin Suns Trilogy Gauntlet build (distinct leaders/bases + combined-copy limit).
 - `deck_diff.py` Shows a GitHub-style diff of two decks (added / removed cards) for deckbuilding iteration.
 - `refresh_cache.py` Downloads / refreshes `card_data/` from the SWUDB API. Run with no arguments to refresh every known set, or pass set abbreviations (e.g. `law ts26`) to refresh specific ones. Use `--list` to see main sets + cache dates (warns when a new main release appears in the API but isn't in `VALID_SETS`), or `--list-all` to include promo / OP / convention sets.
+- `build_ts26_decks.py` Regenerates `card_data/ts26_decks.json` (the TS26 card → pre-con deck mapping) from a CSV export of the "TS Pre-Con Deck Breakdown" sheet.
+- `./card_data/ts26_decks.json` Hand-maintained mapping of each TS26 card number to the pre-constructed Twin Suns deck(s) it appears in. Unlike the rest of `card_data/`, this file is committed (the SWUDB API has no deck-origin field).
 - `./lib/deck_source.py` Unified loader that returns a normalized deck from a SWUDB URL, `.json`, `.txt` picklist, or sorted `.md` file.
 
 **Note on private decks:** The SWUDB deck API only serves **Public** or **Unlisted** decks. A Private deck still renders in the browser but returns 404 from the API. Every deck-fetching script (`sort_deck_by_set.py`, `update_used_card_list.py`, `validate_deck_format.py`, `trilogy_validator.py`, `deck_diff.py`) prints a hint suggesting you change visibility to Unlisted when it sees a 404.
@@ -41,6 +43,7 @@ uv run python sort_deck_by_set.py "path/to/decklist.txt"
 - Groups cards by set (SOR, SHD, TWI, JTL, LOF, SEC, LAW, then TS26), sorted by card number
 - Prefers main sets over promo printings for cards in multiple sets
 - Shows alternate sets for reprints (e.g., "also in: P25, LOFP")
+- Tags TS26 cards with the pre-con deck(s) they came from (e.g., `[from: Blood Brothers]`), since TS26 cards exist only in the four pre-constructed Twin Suns decks and not in any collectable set. A card shared across multiple pre-cons lists each one. Sourced from `card_data/ts26_decks.json`.
 - Outputs to console and saves a `-sorted.md` file in the same folder
 
 **Input formats:**

@@ -1,0 +1,654 @@
+{
+  "decks": [
+    "Against the Odds / Improvised Tactics",
+    "Aggressive Negotiations",
+    "Blood Brothers",
+    "Master and Apprentice"
+  ],
+  "cards": {
+    "001": {
+      "name": "count dooku",
+      "type": "Leader Unit",
+      "decks": [
+        "Master and Apprentice"
+      ]
+    },
+    "002": {
+      "name": "anakin skywalker",
+      "type": "Leader Unit",
+      "decks": [
+        "Aggressive Negotiations"
+      ]
+    },
+    "003": {
+      "name": "maul",
+      "type": "Leader Unit",
+      "decks": [
+        "Against the Odds / Improvised Tactics",
+        "Blood Brothers"
+      ]
+    },
+    "004": {
+      "name": "padmé amidala",
+      "type": "Leader Unit",
+      "decks": [
+        "Aggressive Negotiations"
+      ]
+    },
+    "005": {
+      "name": "savage opress",
+      "type": "Leader Unit",
+      "decks": [
+        "Blood Brothers"
+      ]
+    },
+    "006": {
+      "name": "rex",
+      "type": "Leader Unit",
+      "decks": [
+        "Against the Odds / Improvised Tactics"
+      ]
+    },
+    "007": {
+      "name": "asajj ventress",
+      "type": "Leader Unit",
+      "decks": [
+        "Master and Apprentice"
+      ]
+    },
+    "008": {
+      "name": "ahsoka tano",
+      "type": "Leader Unit",
+      "decks": [
+        "Against the Odds / Improvised Tactics"
+      ]
+    },
+    "009": {
+      "name": "first battle memorial",
+      "type": "Base",
+      "decks": [
+        "Against the Odds / Improvised Tactics"
+      ]
+    },
+    "010": {
+      "name": "dooku’s palace",
+      "type": "Base",
+      "decks": [
+        "Master and Apprentice"
+      ]
+    },
+    "011": {
+      "name": "executioner’s arena",
+      "type": "Base",
+      "decks": [
+        "Aggressive Negotiations"
+      ]
+    },
+    "012": {
+      "name": "sundari palace",
+      "type": "Base",
+      "decks": [
+        "Blood Brothers"
+      ]
+    },
+    "013": {
+      "name": "darth sidious",
+      "type": "Unit",
+      "decks": [
+        "Master and Apprentice"
+      ]
+    },
+    "014": {
+      "name": "yoda",
+      "type": "Unit",
+      "decks": [
+        "Aggressive Negotiations"
+      ]
+    },
+    "015": {
+      "name": "c-3po",
+      "type": "Unit",
+      "decks": [
+        "Aggressive Negotiations",
+        "Master and Apprentice"
+      ]
+    },
+    "016": {
+      "name": "king katuunko",
+      "type": "Unit",
+      "decks": [
+        "Master and Apprentice"
+      ]
+    },
+    "017": {
+      "name": "rush clovis",
+      "type": "Unit",
+      "decks": [
+        "Aggressive Negotiations",
+        "Master and Apprentice"
+      ]
+    },
+    "018": {
+      "name": "jendirian valley",
+      "type": "Unit",
+      "decks": [
+        "Aggressive Negotiations"
+      ]
+    },
+    "019": {
+      "name": "coleman trebor",
+      "type": "Unit",
+      "decks": [
+        "Aggressive Negotiations"
+      ]
+    },
+    "020": {
+      "name": "501st veteran",
+      "type": "Unit",
+      "decks": [
+        "Against the Odds / Improvised Tactics",
+        "Aggressive Negotiations"
+      ]
+    },
+    "021": {
+      "name": "gar saxon",
+      "type": "Unit",
+      "decks": [
+        "Blood Brothers"
+      ]
+    },
+    "022": {
+      "name": "the darksaber",
+      "type": "Upgrade",
+      "decks": [
+        "Blood Brothers"
+      ]
+    },
+    "023": {
+      "name": "assault lander laat",
+      "type": "Unit",
+      "decks": [
+        "Aggressive Negotiations"
+      ]
+    },
+    "024": {
+      "name": "sundari gauntlet",
+      "type": "Unit",
+      "decks": [
+        "Aggressive Negotiations",
+        "Blood Brothers"
+      ]
+    },
+    "025": {
+      "name": "fiery alliance",
+      "type": "Upgrade",
+      "decks": [
+        "Aggressive Negotiations",
+        "Blood Brothers"
+      ]
+    },
+    "026": {
+      "name": "mother talzin",
+      "type": "Unit",
+      "decks": [
+        "Blood Brothers"
+      ]
+    },
+    "027": {
+      "name": "fortune and glory",
+      "type": "Unit",
+      "decks": [
+        "Blood Brothers",
+        "Master and Apprentice"
+      ]
+    },
+    "028": {
+      "name": "Prime Minister Almec",
+      "type": "Unit",
+      "decks": [
+        "Blood Brothers"
+      ]
+    },
+    "029": {
+      "name": "ziton moj",
+      "type": "Unit",
+      "decks": [
+        "Blood Brothers"
+      ]
+    },
+    "030": {
+      "name": "maul",
+      "type": "Unit",
+      "decks": [
+        "Blood Brothers"
+      ]
+    },
+    "031": {
+      "name": "chaotic diversion",
+      "type": "Event",
+      "decks": [
+        "Against the Odds / Improvised Tactics"
+      ]
+    },
+    "032": {
+      "name": "reckless landing",
+      "type": "Event",
+      "decks": [
+        "Against the Odds / Improvised Tactics"
+      ]
+    },
+    "033": {
+      "name": "kouhun assassination",
+      "type": "Event",
+      "decks": [
+        "Master and Apprentice"
+      ]
+    },
+    "034": {
+      "name": "fives",
+      "type": "Unit",
+      "decks": [
+        "Against the Odds / Improvised Tactics"
+      ]
+    },
+    "035": {
+      "name": "ahsoka’s lightsabers",
+      "type": "Upgrade",
+      "decks": [
+        "Against the Odds / Improvised Tactics"
+      ]
+    },
+    "036": {
+      "name": "tribunal",
+      "type": "Unit",
+      "decks": [
+        "Against the Odds / Improvised Tactics"
+      ]
+    },
+    "037": {
+      "name": "abandoned the order",
+      "type": "Upgrade",
+      "decks": [
+        "Against the Odds / Improvised Tactics",
+        "Master and Apprentice"
+      ]
+    },
+    "038": {
+      "name": "dooku’s solar sailer",
+      "type": "Unit",
+      "decks": [
+        "Master and Apprentice"
+      ]
+    },
+    "039": {
+      "name": "captain vaughn",
+      "type": "Unit",
+      "decks": [
+        "Against the Odds / Improvised Tactics"
+      ]
+    },
+    "040": {
+      "name": "obi-wan kenobi",
+      "type": "Unit",
+      "decks": [
+        "Aggressive Negotiations"
+      ]
+    },
+    "041": {
+      "name": "twilight",
+      "type": "Unit",
+      "decks": [
+        "Against the Odds / Improvised Tactics",
+        "Aggressive Negotiations"
+      ]
+    },
+    "042": {
+      "name": "relief frigate",
+      "type": "Unit",
+      "decks": [
+        "Against the Odds / Improvised Tactics",
+        "Aggressive Negotiations",
+        "Master and Apprentice"
+      ]
+    },
+    "043": {
+      "name": "wartime refugee",
+      "type": "Unit",
+      "decks": [
+        "Against the Odds / Improvised Tactics",
+        "Aggressive Negotiations",
+        "Master and Apprentice"
+      ]
+    },
+    "044": {
+      "name": "arena reek",
+      "type": "Unit",
+      "decks": [
+        "Aggressive Negotiations",
+        "Master and Apprentice"
+      ]
+    },
+    "045": {
+      "name": "champion",
+      "type": "Upgrade",
+      "decks": [
+        "Against the Odds / Improvised Tactics",
+        "Aggressive Negotiations",
+        "Master and Apprentice"
+      ]
+    },
+    "046": {
+      "name": "secret marriage",
+      "type": "Event",
+      "decks": [
+        "Aggressive Negotiations"
+      ]
+    },
+    "047": {
+      "name": "take cover",
+      "type": "Event",
+      "decks": [
+        "Against the Odds / Improvised Tactics",
+        "Aggressive Negotiations",
+        "Master and Apprentice"
+      ]
+    },
+    "048": {
+      "name": "vanquish the legion",
+      "type": "Event",
+      "decks": [
+        "Against the Odds / Improvised Tactics",
+        "Master and Apprentice"
+      ]
+    },
+    "049": {
+      "name": "separatist council",
+      "type": "Unit",
+      "decks": [
+        "Master and Apprentice"
+      ]
+    },
+    "050": {
+      "name": "general grievous",
+      "type": "Unit",
+      "decks": [
+        "Master and Apprentice"
+      ]
+    },
+    "051": {
+      "name": "lom pyke",
+      "type": "Unit",
+      "decks": [
+        "Blood Brothers",
+        "Master and Apprentice"
+      ]
+    },
+    "052": {
+      "name": "sith traditions",
+      "type": "Upgrade",
+      "decks": [
+        "Blood Brothers",
+        "Master and Apprentice"
+      ]
+    },
+    "053": {
+      "name": "coruscanti spy",
+      "type": "Unit",
+      "decks": [
+        "Aggressive Negotiations",
+        "Blood Brothers",
+        "Master and Apprentice"
+      ]
+    },
+    "054": {
+      "name": "wartime mercenaries",
+      "type": "Unit",
+      "decks": [
+        "Aggressive Negotiations",
+        "Blood Brothers",
+        "Master and Apprentice"
+      ]
+    },
+    "055": {
+      "name": "jedi general",
+      "type": "Unit",
+      "decks": [
+        "Aggressive Negotiations"
+      ]
+    },
+    "056": {
+      "name": "galactic escalation",
+      "type": "Event",
+      "decks": [
+        "Aggressive Negotiations",
+        "Blood Brothers",
+        "Master and Apprentice"
+      ]
+    },
+    "057": {
+      "name": "mechanize",
+      "type": "Event",
+      "decks": [
+        "Aggressive Negotiations",
+        "Blood Brothers"
+      ]
+    },
+    "058": {
+      "name": "backed by the pykes",
+      "type": "Event",
+      "decks": [
+        "Blood Brothers"
+      ]
+    },
+    "059": {
+      "name": "brothers",
+      "type": "Event",
+      "decks": [
+        "Blood Brothers"
+      ]
+    },
+    "060": {
+      "name": "take charge",
+      "type": "Event",
+      "decks": [
+        "Aggressive Negotiations",
+        "Blood Brothers",
+        "Master and Apprentice"
+      ]
+    },
+    "061": {
+      "name": "encircle",
+      "type": "Event",
+      "decks": [
+        "Aggressive Negotiations",
+        "Master and Apprentice"
+      ]
+    },
+    "062": {
+      "name": "r2-d2",
+      "type": "Unit",
+      "decks": [
+        "Against the Odds / Improvised Tactics",
+        "Aggressive Negotiations"
+      ]
+    },
+    "063": {
+      "name": "rex’s dc-17s",
+      "type": "Upgrade",
+      "decks": [
+        "Against the Odds / Improvised Tactics"
+      ]
+    },
+    "064": {
+      "name": "urgent mission",
+      "type": "Event",
+      "decks": [
+        "Aggressive Negotiations"
+      ]
+    },
+    "065": {
+      "name": "bo-katan kryze",
+      "type": "Unit",
+      "decks": [
+        "Against the Odds / Improvised Tactics",
+        "Blood Brothers"
+      ]
+    },
+    "066": {
+      "name": "wartime pirate",
+      "type": "Unit",
+      "decks": [
+        "Against the Odds / Improvised Tactics",
+        "Aggressive Negotiations",
+        "Blood Brothers"
+      ]
+    },
+    "067": {
+      "name": "ruping rider",
+      "type": "Unit",
+      "decks": [
+        "Against the Odds / Improvised Tactics",
+        "Aggressive Negotiations",
+        "Blood Brothers"
+      ]
+    },
+    "068": {
+      "name": "arms deal",
+      "type": "Event",
+      "decks": [
+        "Against the Odds / Improvised Tactics",
+        "Aggressive Negotiations",
+        "Blood Brothers"
+      ]
+    },
+    "069": {
+      "name": "remove the chip",
+      "type": "Event",
+      "decks": [
+        "Against the Odds / Improvised Tactics"
+      ]
+    },
+    "070": {
+      "name": "backed by black sun",
+      "type": "Event",
+      "decks": [
+        "Blood Brothers"
+      ]
+    },
+    "071": {
+      "name": "take action",
+      "type": "Event",
+      "decks": [
+        "Against the Odds / Improvised Tactics",
+        "Aggressive Negotiations",
+        "Blood Brothers"
+      ]
+    },
+    "072": {
+      "name": "fervor",
+      "type": "Event",
+      "decks": [
+        "Aggressive Negotiations",
+        "Blood Brothers"
+      ]
+    },
+    "073": {
+      "name": "moralo eval",
+      "type": "Unit",
+      "decks": [
+        "Master and Apprentice"
+      ]
+    },
+    "074": {
+      "name": "pre vizsla",
+      "type": "Unit",
+      "decks": [
+        "Blood Brothers",
+        "Master and Apprentice"
+      ]
+    },
+    "075": {
+      "name": "jango fett",
+      "type": "Unit",
+      "decks": [
+        "Master and Apprentice"
+      ]
+    },
+    "076": {
+      "name": "wartime profiteer",
+      "type": "Unit",
+      "decks": [
+        "Against the Odds / Improvised Tactics",
+        "Blood Brothers",
+        "Master and Apprentice"
+      ]
+    },
+    "077": {
+      "name": "deployed droideka",
+      "type": "Unit",
+      "decks": [
+        "Against the Odds / Improvised Tactics",
+        "Blood Brothers",
+        "Master and Apprentice"
+      ]
+    },
+    "078": {
+      "name": "barriss offee",
+      "type": "Unit",
+      "decks": [
+        "Against the Odds / Improvised Tactics",
+        "Master and Apprentice"
+      ]
+    },
+    "079": {
+      "name": "underestimated",
+      "type": "Upgrade",
+      "decks": [
+        "Against the Odds / Improvised Tactics",
+        "Master and Apprentice"
+      ]
+    },
+    "080": {
+      "name": "reveal intentions",
+      "type": "Event",
+      "decks": [
+        "Against the Odds / Improvised Tactics",
+        "Blood Brothers"
+      ]
+    },
+    "081": {
+      "name": "mislead",
+      "type": "Event",
+      "decks": [
+        "Against the Odds / Improvised Tactics",
+        "Blood Brothers",
+        "Master and Apprentice"
+      ]
+    },
+    "082": {
+      "name": "evade arrest",
+      "type": "Event",
+      "decks": [
+        "Against the Odds / Improvised Tactics",
+        "Blood Brothers"
+      ]
+    },
+    "083": {
+      "name": "take aim",
+      "type": "Event",
+      "decks": [
+        "Against the Odds / Improvised Tactics",
+        "Blood Brothers",
+        "Master and Apprentice"
+      ]
+    },
+    "084": {
+      "name": "fearless attack",
+      "type": "Event",
+      "decks": [
+        "Against the Odds / Improvised Tactics",
+        "Aggressive Negotiations"
+      ]
+    }
+  }
+}
