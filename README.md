@@ -24,6 +24,7 @@ Note: If you are not sure how to do this. ChatGPT generated a step by step how-t
 - `trilogy_validator.py` Validates three SWU decks together as a Premier Trilogy or Twin Suns Trilogy Gauntlet build (distinct leaders/bases + combined-copy limit).
 - `deck_diff.py` Shows a GitHub-style diff of two decks (added / removed cards) for deckbuilding iteration.
 - `refresh_cache.py` Downloads / refreshes `card_data/` from the SWUDB API. Run with no arguments to refresh every known set, or pass set abbreviations (e.g. `law ts26`) to refresh specific ones. Use `--list` to see main sets + cache dates (warns when a new main release appears in the API but isn't in `VALID_SETS`), or `--list-all` to include promo / OP / convention sets.
+- `export_website_data.py` Exports the `card_data/` cache as pruned per-set JSON (+ `index.json`) for the swudecktools website (`../swudecktools/website/public/data/` by default). Run after `refresh_cache.py` whenever set data changes.
 - `build_ts26_decks.py` Regenerates `card_data/ts26_decks.json` (the TS26 card → pre-con deck mapping) from a CSV export of the "TS Pre-Con Deck Breakdown" sheet.
 - `./card_data/ts26_decks.json` Hand-maintained mapping of each TS26 card number to the pre-constructed Twin Suns deck(s) it appears in. Unlike the rest of `card_data/`, this file is committed (the SWUDB API has no deck-origin field).
 - `./lib/deck_source.py` Unified loader that returns a normalized deck from a SWUDB URL, `.json`, `.txt` picklist, or sorted `.md` file.

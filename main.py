@@ -17,7 +17,7 @@ def get_doc_sheet(sheet_name):
     client = gspread.authorize(creds)
 
     # Open the spreadsheet and select a worksheet
-    spreadsheet = client.open("SWU Sets Inventory")
+    spreadsheet = client.open("SWU Sets Playset")
     return spreadsheet.worksheet(sheet_name)
 
 
@@ -88,9 +88,10 @@ if __name__ == '__main__':
     # update_list_names('shd')
     # update_list_names('twi')
     # update_list_names('jtl')
+    # update_list_names('law')  # A Lawless Time - releases 2026-03-06
 
     # Not yet released
-    update_list_names('law')  # A Lawless Time - releases 2026-03-06
+    update_list_names('ash')  # Ashes of the Empire - releases 2026-07-17
 
 
 

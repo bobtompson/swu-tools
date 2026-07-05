@@ -1,0 +1,11 @@
+{
+  "_comment": "Official per-set signature colors from the SWU media kit (SWH_Color_SWH_NN swatches). Hex sampled from the solid swatch image. Intro Battle: Hoth (IBH) has no set color.",
+  "SOR": { "name": "Spark of Rebellion",       "hex": "#e10600" },
+  "SHD": { "name": "Shadows of the Galaxy",    "hex": "#3b3fb6" },
+  "TWI": { "name": "Twilight of the Republic", "hex": "#7c2529" },
+  "JTL": { "name": "Jump to Lightspeed",       "hex": "#f2a900" },
+  "LOF": { "name": "Legends of the Force",     "hex": "#00a3e0" },
+  "SEC": { "name": "Secrets of Power",         "hex": "#68177f" },
+  "LAW": { "name": "A Lawless Time",           "hex": "#ff6900" },
+  "ASH": { "name": "Ashes of the Empire",      "hex": "#425563" }
+}
