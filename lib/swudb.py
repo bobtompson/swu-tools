@@ -59,7 +59,8 @@ PRERELEASE_DAYS = 7
 # Release-date overrides ("M/D/YY") for sets whose swu-db catalog date is wrong
 # or missing. ASH's full release is 7/17/26 (catalog says 7/27/26) ->
 # Premier-legal 7/10/26. IC27 releases 11/20/26 -> Premier-legal 11/13/26.
-RELEASE_DATE_OVERRIDES = {"ASH": "7/17/26", "IC27": "11/20/26"}
+# TS26 released 5/8/26 (catalog says 7/11/26) — display-only, Premier-excluded.
+RELEASE_DATE_OVERRIDES = {"ASH": "7/17/26", "IC27": "11/20/26", "TS26": "5/8/26"}
 
 # Card-name bans in Premier (independent of set legality).
 PREMIER_SUSPENDED_CARDS = {
