@@ -74,6 +74,9 @@ google.text
 # Deck lists
 swudb_lists/
 
+# Generated buy list
+buy_list.txt
+
 # Card data (API cache). The hand-maintained card_data/ts26_decks.json is the
 # one exception — it's force-added (git add -f) since it's sourced data, not cache.
 card_data/

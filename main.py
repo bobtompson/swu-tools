@@ -4,8 +4,8 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
 
-def get_doc_sheet(sheet_name):
-# Returns the specific sub sheet in the google spreadsheet
+def get_spreadsheet():
+# Returns the inventory google spreadsheet
     # Define scope
     scope = [
         "https://spreadsheets.google.com/feeds",
@@ -16,9 +16,13 @@ def get_doc_sheet(sheet_name):
     creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
     client = gspread.authorize(creds)
 
-    # Open the spreadsheet and select a worksheet
-    spreadsheet = client.open("SWU Sets Playset")
-    return spreadsheet.worksheet(sheet_name)
+    # Open the spreadsheet
+    return client.open("SWU Sets Playset")
+
+
+def get_doc_sheet(sheet_name):
+# Returns the specific sub sheet in the google spreadsheet
+    return get_spreadsheet().worksheet(sheet_name)
 
 
 def test_sheets():

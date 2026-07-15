@@ -28,6 +28,10 @@ Note: If you are not sure how to do this. ChatGPT generated a step by step how-t
 - `build_ts26_decks.py` Regenerates `card_data/ts26_decks.json` (the TS26 card → pre-con deck mapping) from a CSV export of the "TS Pre-Con Deck Breakdown" sheet.
 - `./card_data/ts26_decks.json` Hand-maintained mapping of each TS26 card number to the pre-constructed Twin Suns deck(s) it appears in. Unlike the rest of `card_data/`, this file is committed (the SWUDB API has no deck-origin field).
 - `./lib/deck_source.py` Unified loader that returns a normalized deck from a SWUDB URL, `.json`, `.txt` picklist, or sorted `.md` file.
+- `./lib/tcgcsv.py` TCGplayer price data via tcgcsv.com (free daily mirror, no API key). Maps each set abbreviation to its TCGplayer group and returns market/low prices keyed by 3-digit card number.
+- `update_prices.py` Writes TCGplayer Market/Low prices into columns H/I of a set's inventory tab.
+- `generate_buy_list.py` Scans the inventory tabs for cards short of a full playset (3 copies) and writes a priced `buy_list.txt`.
+- `showcase_prices.py` Prints TCGplayer prices for every set's showcase (collector leader) variants; `--update-sheet` also writes them to the Collector tab.
 
 **Note on private decks:** The SWUDB deck API only serves **Public** or **Unlisted** decks. A Private deck still renders in the browser but returns 404 from the API. Every deck-fetching script (`sort_deck_by_set.py`, `update_used_card_list.py`, `validate_deck_format.py`, `trilogy_validator.py`, `deck_diff.py`) prints a hint suggesting you change visibility to Unlisted when it sees a 404.
 
@@ -165,7 +169,48 @@ How I set up my inventory. I set up my functions in `main.py` with this format i
 - In cell H1 of every tab I have the card count for that set(listed here: 'https://swudb.com/sets').
 - The card names are Column B starting at cell B3
 - Card rarities are column D starting at D3
+- Owned-copy counts are column C starting at C3 (used by `generate_buy_list.py`)
+- TCGplayer prices are columns H (Market) and I (Low) starting at row 3, written by `update_prices.py`
 ![Sheet Example](images/sheet-example.png)
+
+## Card Prices & Buy List
+
+Prices come from [tcgcsv.com](https://tcgcsv.com), a free daily mirror of TCGplayer pricing (no API key needed). Both scripts use the Normal (non-foil) printing of each card.
+
+**Write prices onto a set's inventory tab (columns H/I):**
+```bash
+uv run python update_prices.py ash        # one set
+uv run python update_prices.py law sec    # several sets in one run
+```
+
+**Generate a buy list of cards short of a full playset (3 copies):**
+```bash
+uv run python generate_buy_list.py               # every set tab in the sheet
+uv run python generate_buy_list.py law ash       # specific sets
+uv run python generate_buy_list.py --all         # include leaders and bases
+uv run python generate_buy_list.py -o wants.txt  # custom output file
+```
+
+The buy list (`buy_list.txt` by default) shows how many copies are needed per card with market/low prices, per-set subtotals, and a grand total. Leaders and bases are excluded by default (card types come from the cached swu-db set data); pass `--all` to include them. A blank Count cell means the card isn't tracked and is ignored — enter an explicit `0` for a wanted card you own none of. Cards without a TCGplayer price yet (common during presale) show `n/a` and are excluded from totals — this can make a presale set's low total exceed its market total, since more cards have listing prices than sale-history prices.
+
+New sets need their TCGplayer group id added to `GROUPS` in `lib/tcgcsv.py` (list groups with `curl https://tcgcsv.com/tcgplayer/79/groups`).
+
+## Showcase Prices
+
+Showcases are the foil-only collector printing of each leader (one per leader per set). `showcase_prices.py` prints a per-set price list and can maintain the **Collector** tab of the inventory sheet.
+
+```bash
+uv run python showcase_prices.py                 # all main sets, console only
+uv run python showcase_prices.py law ash         # specific sets
+uv run python showcase_prices.py --no-listings   # skip availability lookups (faster)
+uv run python showcase_prices.py --update-sheet  # also update the Collector tab
+```
+
+Each line shows the showcase's card number, the leader, the original (base) card number, market/low prices, and live market availability (`avail 4 in 3 listings` = 4 copies across 3 seller listings). Availability comes from TCGplayer's own marketplace API — one request per card, so pass `--no-listings` for a faster prices-only run; if TCGplayer starts blocking, the script degrades to prices-only automatically. The base number comes from matching the showcase's number into the swu-db set data (every printing of a leader is its own row there; the lowest number is the original) — if the local cache predates a set's variant data, the script refreshes it automatically.
+
+`--update-sheet` fills the Collector tab columns: Card Num., Card Name, Count (hand-entered, never touched), Original Card Number, Source (`LAW Showcase`), Current Price (market). Rows are matched by Card Num. + Source, so reruns refresh prices in place, new sets append, and any other rows on the tab are left alone.
+
+Note: SOR has only 16 priceable showcases — the ultra-rare Luke Skywalker "Faithful Friend" and Darth Vader "Dark Lord of the Sith" showcases are not cataloged as TCGplayer products.
 
 ## Notes:
 - The google api only supports so many actions per minute, so if you want to add and retrieve data from your sheet keep that in mind. This is why I gather a list data struct and push the whole list to the sheet at once when updating the rename column.
