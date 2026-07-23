@@ -2,17 +2,19 @@
 
 Reads the inventory spreadsheet (the same tabs main.py maintains), finds
 every card with fewer than PLAYSET copies, prices the missing copies via
-TCGplayer (tcgcsv.com), and writes a text buy list.
+TCGplayer (tcgcsv.com), and prints a buy list to the console (or writes
+it to a file with -o).
 
 Leaders and bases are skipped by default (you rarely need a playset of
 those); pass --all to include them. Blank Count cells are ignored — blank
 means "not tracked", so a wanted card owned zero times gets an explicit 0.
 
 Usage:
-    uv run python generate_buy_list.py               # every set tab found
-    uv run python generate_buy_list.py law ash       # specific sets
-    uv run python generate_buy_list.py --all         # include leaders/bases
-    uv run python generate_buy_list.py -o wants.txt  # custom output file
+    uv run python generate_buy_list.py                  # every set tab found
+    uv run python generate_buy_list.py law ash          # specific sets
+    uv run python generate_buy_list.py --all            # include leaders/bases
+    uv run python generate_buy_list.py --max-price 2.00 # only cards at/under $2.00 market
+    uv run python generate_buy_list.py -o wants.txt     # write to a file instead
 """
 
 import datetime as dt
@@ -23,7 +25,6 @@ import lib.tcgcsv as tcgcsv
 from main import get_spreadsheet
 
 PLAYSET = 3
-DEFAULT_OUTPUT = 'buy_list.txt'
 
 # Row/column layout of each set tab (see main.py / CLAUDE.md)
 HEADER_ROWS = 2  # data starts at row 3
@@ -95,12 +96,14 @@ def format_money(value):
     return f'${value:,.2f}' if value is not None else '   n/a'
 
 
-def build_set_section(set_name, missing, price_map, blanks=0):
+def build_set_section(set_name, missing, price_map, blanks=0, over_limit=0):
     """Format one set's buy-list section. Returns (lines, market_total, low_total)."""
     lines = [f'=== {set_name.upper()} — {tcgcsv.get_set_display_name(set_name)} ===']
     if blanks:
         lines.append(f'  note: {blanks} cards with a blank count were ignored '
                      f'(blank = not tracked)')
+    if over_limit:
+        lines.append(f'  note: {over_limit} cards over the price limit were excluded')
     market_total = low_total = 0.0
 
     for card in missing:
@@ -124,7 +127,26 @@ def build_set_section(set_name, missing, price_map, blanks=0):
     return lines, market_total, low_total
 
 
-def generate_buy_list(set_names, output_path=DEFAULT_OUTPUT, include_leaders_bases=False):
+def filter_by_price(missing, price_map, max_price):
+    """Split missing cards into (kept, over_limit_count) by market price.
+
+    Cards with no market price (n/a, e.g. presale) are kept — the limit
+    only excludes cards known to cost more than max_price.
+    """
+    kept = []
+    over_limit = 0
+    for card in missing:
+        entry = (price_map or {}).get(card['number'].zfill(3))
+        market = entry['market'] if entry else None
+        if market is not None and market > max_price:
+            over_limit += 1
+        else:
+            kept.append(card)
+    return kept, over_limit
+
+
+def generate_buy_list(set_names, output_path=None, include_leaders_bases=False,
+                      max_price=None):
     spreadsheet = get_spreadsheet()
 
     if not set_names:
@@ -143,6 +165,9 @@ def generate_buy_list(set_names, output_path=DEFAULT_OUTPUT, include_leaders_bas
     ]
     if not include_leaders_bases:
         lines.append('Leaders and bases excluded (run with --all to include them).')
+    if max_price is not None:
+        lines.append(f'Price limit: cards with a market price over '
+                     f'{format_money(max_price)} excluded.')
     lines.append('')
     grand_market = grand_low = 0.0
     grand_cards = grand_copies = 0
@@ -157,19 +182,24 @@ def generate_buy_list(set_names, output_path=DEFAULT_OUTPUT, include_leaders_bas
 
         skip = set() if include_leaders_bases else leader_base_numbers(set_name)
         missing, blanks, skipped = missing_cards_for_sheet(sheet, skip)
+        price_map = tcgcsv.get_price_map(set_name) if missing else None
+        over_limit = 0
+        if max_price is not None:
+            missing, over_limit = filter_by_price(missing, price_map, max_price)
         notes = []
         if blanks:
             notes.append(f'{blanks} blank-count cards ignored')
         if skipped:
             notes.append(f'skipped {skipped} leaders/bases')
+        if over_limit:
+            notes.append(f'{over_limit} over the price limit')
         note = f" ({'; '.join(notes)})" if notes else ''
         print(f'{set_name.upper()}: {len(missing)} cards short of a playset{note}')
         if not missing:
             continue
 
-        price_map = tcgcsv.get_price_map(set_name)
         section, market_total, low_total = build_set_section(
-            set_name, missing, price_map, blanks)
+            set_name, missing, price_map, blanks, over_limit)
         lines.extend(section)
         grand_market += market_total
         grand_low += low_total
@@ -179,15 +209,20 @@ def generate_buy_list(set_names, output_path=DEFAULT_OUTPUT, include_leaders_bas
     lines.append(f'=== TOTAL: {grand_cards} cards / {grand_copies} copies — '
                  f'market {format_money(grand_market)}, low {format_money(grand_low)} ===')
 
-    with open(output_path, 'w', encoding='utf-8') as f:
-        f.write('\n'.join(lines) + '\n')
-    print(f'\nBuy list written to {output_path}')
-    print(lines[-1])
+    if output_path:
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(lines) + '\n')
+        print(f'\nBuy list written to {output_path}')
+        print(lines[-1])
+    else:
+        print()
+        print('\n'.join(lines))
 
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    output = DEFAULT_OUTPUT
+    output = None
+    max_price = None
     include_all = '--all' in args
     if include_all:
         args.remove('--all')
@@ -199,5 +234,14 @@ if __name__ == '__main__':
             print('Error: -o requires a file path')
             sys.exit(1)
         del args[idx:idx + 2]
+    if '--max-price' in args:
+        idx = args.index('--max-price')
+        try:
+            max_price = float(args[idx + 1].lstrip('$'))
+        except (IndexError, ValueError):
+            print('Error: --max-price requires a dollar amount (e.g. --max-price 2.00)')
+            sys.exit(1)
+        del args[idx:idx + 2]
 
-    generate_buy_list(args, output, include_leaders_bases=include_all)
+    generate_buy_list(args, output, include_leaders_bases=include_all,
+                      max_price=max_price)
