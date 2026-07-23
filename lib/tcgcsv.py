@@ -35,6 +35,16 @@ def get_set_display_name(set_name):
     return group[1] if group else set_name.upper()
 
 
+# Corrections for TCGplayer data errors: productId -> actual card number.
+NUMBER_FIXES = {
+    697960: 3,   # ASH Baylan Skoll 'Power Beyond Dream': mislabeled 4/264,
+                 # colliding with Thrawn (the real 4/264); swu-db has it at 003
+    679521: 56,  # TS26 Galactic Escalation: mislabeled 58/64 (Backed by the
+                 # Pykes' number); swu-db has it at 056
+    679523: 63,  # TS26 Rex's DC-17s: mislabeled 83/64 (Take Aim's number);
+                 # swu-db has it at 063
+}
+
 # tcgcsv.com returns 401 for the default python-requests user agent
 REQUEST_HEADERS = {'User-Agent': 'swu-tools/1.0 (SWU inventory scripts)'}
 
@@ -47,6 +57,16 @@ def _fetch_results(endpoint, timeout=30):
     return response.json()['results']
 
 
+def _front_name(product_name):
+    """Card name with back-side ('// Shield') and finish ('(Gold)')
+    qualifiers stripped, for telling variants of one card apart from
+    two different cards sharing a number."""
+    name = product_name.split(' // ')[0]
+    while name.endswith(')') and ' (' in name:
+        name = name[:name.rindex(' (')]
+    return name
+
+
 def _card_number(product):
     """Extract the numeric card number from a product's extendedData.
 
@@ -54,6 +74,9 @@ def _card_number(product):
     (variants above the printed count). Returns an int, or None for
     non-card products such as sealed boosters.
     """
+    fix = NUMBER_FIXES.get(product['productId'])
+    if fix is not None:
+        return fix
     for entry in product.get('extendedData', []):
         if entry['name'] == 'Number':
             try:
@@ -112,6 +135,19 @@ def get_price_map(set_name, timeout=30):
         price = printings.get('Normal') or printings.get('Foil')
         if price is None:
             continue
+        # Variants of one card (back sides of double-sided bases, serialized
+        # finishes) legitimately share a number; only a different card name
+        # signals a TCGplayer data error (e.g. Baylan Skoll mislabeled with
+        # Thrawn's number in ASH).
+        existing = price_map.get(f'{number:03d}')
+        if (existing is not None
+                and _front_name(existing['name'])
+                != _front_name(product['name'])):
+            print(f"Warning: TCGplayer lists two products as card {number:03d} "
+                  f"in {set_name.upper()}: '{existing['name']}' and "
+                  f"'{product['name']}' — keeping the latter. If it's a "
+                  f"TCGplayer data error, add the productId to "
+                  f"tcgcsv.NUMBER_FIXES.")
         price_map[f'{number:03d}'] = {
             'name': product['name'],
             'market': price.get('marketPrice'),
@@ -123,13 +159,15 @@ def get_price_map(set_name, timeout=30):
     return price_map
 
 
-def get_showcase_list(set_name, timeout=30):
-    """Get the showcase (collector leader) variants of a set with prices.
+def get_variant_list(set_name, tag, timeout=30):
+    """Get a set's variant printings matching a TCGplayer name tag.
 
-    Showcase products are identified by '(Showcase)' in the TCGplayer name
-    and are foil-only printings. Returns a list sorted by card number:
+    tag is the parenthesized qualifier in the product name, e.g.
+    '(Showcase)', '(Prestige)', or '(Prestige Foil)' — matching is exact
+    including the closing paren, so '(Prestige)' does not match
+    '(Prestige Foil)' products. Returns a list sorted by card number:
     [{'number': '771', 'name': 'Jyn Erso - Time to Fight',
-      'market': float|None, 'low': float|None}, ...]
+      'product_id': int, 'market': float|None, 'low': float|None}, ...]
     Returns None on network failure or unknown set.
     """
     data = _fetch_group_data(set_name, timeout)
@@ -137,25 +175,33 @@ def get_showcase_list(set_name, timeout=30):
         return None
     products, by_product = data
 
-    showcases = []
+    variants = []
     for product in products:
-        if '(Showcase)' not in product['name']:
+        if tag not in product['name']:
             continue
         number = _card_number(product)
         if number is None:
             continue
         printings = by_product.get(product['productId'], {})
         price = printings.get('Foil') or printings.get('Normal') or {}
-        showcases.append({
+        variants.append({
             'number': f'{number:03d}',
-            'name': product['name'].replace('(Showcase)', '').strip(),
+            'name': product['name'].replace(tag, '').strip(),
             'product_id': product['productId'],
             'market': price.get('marketPrice'),
             'low': price.get('lowPrice'),
         })
 
-    showcases.sort(key=lambda s: s['number'])
-    return showcases
+    variants.sort(key=lambda s: s['number'])
+    return variants
+
+
+def get_showcase_list(set_name, timeout=30):
+    """Get the showcase (collector leader) variants of a set with prices.
+
+    Showcase printings are foil-only. See get_variant_list for the shape.
+    """
+    return get_variant_list(set_name, '(Showcase)', timeout)
 
 
 # TCGplayer's own marketplace search API (not tcgcsv). Answers plain

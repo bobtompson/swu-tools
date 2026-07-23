@@ -30,11 +30,12 @@ HEADER_ROWS = 2  # row 1 title, row 2 column headers; data starts at row 3
 COL_NUM, COL_NAME, COL_COUNT, COL_ORIGINAL, COL_SOURCE, COL_PRICE = range(6)
 
 
-def original_leader_number(set_df, variant_number):
-    """Map a showcase variant number to the leader's original card number.
+def original_card_number(set_df, variant_number):
+    """Map a variant printing's number to the card's original number.
 
-    swu-db lists every printing of a leader (base / hyperspace / showcase)
-    as its own row sharing Name+Subtitle; the lowest number is the original.
+    swu-db lists every printing of a card (base / hyperspace / showcase /
+    prestige) as its own row sharing Name+Subtitle; the lowest number is
+    the original. Works for any card type, not just leaders.
     Returns '' when the variant isn't in the set data.
     """
     if set_df is None:
@@ -43,9 +44,14 @@ def original_leader_number(set_df, variant_number):
     if match.empty:
         return ''
     card = match.iloc[0]
+    # NaN is truthy, so `or ''` won't normalize a missing subtitle —
+    # non-leader cards usually have none
+    subtitle = card['Subtitle'] if isinstance(card['Subtitle'], str) else ''
     same = set_df[(set_df['Name'] == card['Name'])
-                  & (set_df['Subtitle'].fillna('') == (card['Subtitle'] or ''))]
-    return min(same['Number'])
+                  & (set_df['Subtitle'].fillna('') == subtitle)]
+    # Numbers are strings and variant numbers can be 4 digits (JTL 1028+),
+    # so a plain min() would compare lexicographically ('1028' < '104')
+    return min(same['Number'], key=int)
 
 
 def collect_showcases(set_names):
@@ -68,13 +74,13 @@ def collect_showcases(set_names):
             continue
         set_df = swudb.get_swu_list(set_name)
         for entry in showcases:
-            entry['original'] = original_leader_number(set_df, entry['number'])
+            entry['original'] = original_card_number(set_df, entry['number'])
         if any(not entry['original'] for entry in showcases):
             # A cache written before a set's variants were published lacks
             # the showcase numbers — refresh once and retry the mapping
             set_df = swudb.get_swu_list(set_name, force_refresh=True)
             for entry in showcases:
-                entry['original'] = original_leader_number(set_df, entry['number'])
+                entry['original'] = original_card_number(set_df, entry['number'])
         results[set_name] = showcases
     return results
 

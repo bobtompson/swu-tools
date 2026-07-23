@@ -11,6 +11,12 @@ import requests
 
 import lib.swudb as swudb
 
+# SWUDB deckFormat enum (from the site's own code): 1=Premier, 2=TwinSuns,
+# 3=Trilogy. There is no Eternal code — Eternal decks are saved as Premier
+# format, and only legality checks can tell them apart. Code 3 is deliberately
+# NOT mapped here: detect_deck_type then falls back to the structural check,
+# so a deck saved as Trilogy format is treated as Premier-style — which is
+# what trilogy_validator's per-deck validation expects.
 DECK_FORMATS = {
     1: "Premier-style constructed",
     2: "Twin Suns",
@@ -31,6 +37,22 @@ ALIGNMENT_ASPECT_IDS = {
     HEROISM_ASPECT_ID: "Heroism",
     VILLAINY_ASPECT_ID: "Villainy",
 }
+
+# Full SWUDB aspect id -> name mapping (ids appear in frontsideAspects and
+# the deck-level 'aspects' list).
+ASPECT_NAMES = {
+    1: "Vigilance",
+    2: "Command",
+    3: "Aggression",
+    4: "Cunning",
+    5: "Heroism",
+    6: "Villainy",
+}
+
+
+def aspect_names(aspect_ids):
+    """Sorted, de-duplicated aspect names for a list of SWUDB aspect ids."""
+    return [ASPECT_NAMES[a] for a in sorted(set(aspect_ids or [])) if a in ASPECT_NAMES]
 
 
 def is_swudb_url(input_str):
@@ -144,6 +166,7 @@ def normalize_deck(data):
         "base": base,
         "mainboard": mainboard,
         "sideboard": sideboard,
+        "aspects": data.get("aspects") or [],
     }
 
 

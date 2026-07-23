@@ -3,6 +3,7 @@ import os
 import json
 import re
 from collections import defaultdict
+from datetime import datetime
 import requests
 from lib.swudb import MAIN_SETS_UPPER, SPECIAL_SETS_UPPER, VALID_SETS_UPPER
 import validate_deck_format as vdf
@@ -420,6 +421,11 @@ def format_header(metadata):
     if card_lines:
         lines.append("  \n".join(card_lines))
         lines.append("")
+
+    # lib.deck_source._from_markdown skips unrecognized header lines, so
+    # this stamp doesn't affect re-parsing the file as a deck source.
+    lines.append(f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    lines.append("")
 
     # Separator
     lines.append("---")

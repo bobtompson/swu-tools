@@ -129,6 +129,7 @@ def _build_partial_deck(cards, metadata, source):
         "base": base,
         "mainboard": mainboard,
         "sideboard": [],
+        "aspects": [],
         "metadata_complete": False,
         "source": source,
     }

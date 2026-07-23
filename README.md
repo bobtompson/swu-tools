@@ -19,7 +19,9 @@ Note: If you are not sure how to do this. ChatGPT generated a step by step how-t
 - `./card_data/` cached JSON files for each set (loaded before hitting the API)
 - `lookup_card.py` Start of a card lookup script, should pull all info of a card based on set and card number and print it to console.
 - `sort_deck_by_set.py` Takes a deck list and outputs cards sorted by set. Useful for gathering cards from binders organized by set.
-- `update_used_card_list.py` Tracks all cards in use across multiple SWUDB decks. Maintains a SQLite database and exports a markdown summary.
+- `update_used_card_list.py` Builds a card-usage SQLite database and per-deck summary report from a text file of SWUDB deck URLs (one grouping per list file).
+- `find_card.py` Looks up which tracked decks use a card (`find_card.py ash 199`) across all grouping databases, plus the owned count from the inventory snapshot.
+- `sync_inventory.py` Snapshots the inventory sheet's owned counts into `card_data/inventory.db` so lookups don't need the Google Sheets API.
 - `validate_deck_format.py` Fetches a SWUDB deck, detects whether it is Premier-style or Twin Suns, and reports legality for Premier, Eternal, and Twin Suns.
 - `trilogy_validator.py` Validates three SWU decks together as a Premier Trilogy or Twin Suns Trilogy Gauntlet build (distinct leaders/bases + combined-copy limit).
 - `deck_diff.py` Shows a GitHub-style diff of two decks (added / removed cards) for deckbuilding iteration.
@@ -32,6 +34,7 @@ Note: If you are not sure how to do this. ChatGPT generated a step by step how-t
 - `update_prices.py` Writes TCGplayer Market/Low prices into columns H/I of a set's inventory tab.
 - `generate_buy_list.py` Scans the inventory tabs for cards short of a full playset (3 copies) and writes a priced `buy_list.txt`.
 - `showcase_prices.py` Prints TCGplayer prices for every set's showcase (collector leader) variants; `--update-sheet` also writes them to the Collector tab.
+- `prestige_prices.py` Prints TCGplayer prices for prestige variants (normal + foil tiers; serialized excluded). `--mark-sheet` bold-borders the column E cell of every prestige-printing card on the set tabs.
 
 **Note on private decks:** The SWUDB deck API only serves **Public** or **Unlisted** decks. A Private deck still renders in the browser but returns 404 from the API. Every deck-fetching script (`sort_deck_by_set.py`, `update_used_card_list.py`, `validate_deck_format.py`, `trilogy_validator.py`, `deck_diff.py`) prints a hint suggesting you change visibility to Unlisted when it sees a 404.
 
@@ -55,53 +58,70 @@ uv run python sort_deck_by_set.py "path/to/decklist.txt"
 - Picklist format: Export from swudb.com deck builder (has card names + all set printings)
 - JSON format: Export from swudb.com (has set/number, card names fetched via API)
 
-## Used Card List Tracker
+## Deck Group Tracker
 
-The `update_used_card_list.py` script tracks all cards in use across multiple SWUDB decks.
+The `update_used_card_list.py` script builds a card-usage database and summary report from a list of SWUDB deck URLs. Each list file is its own grouping (e.g. one for Twin Suns decks, one for Premier decks).
 
 **Usage:**
 ```bash
-# Add a deck to tracking
-uv run python update_used_card_list.py add "https://swudb.com/deck/KRvnhNGlV"
-
-# Remove a deck from tracking
-uv run python update_used_card_list.py remove "https://swudb.com/deck/KRvnhNGlV"
-
-# List all tracked decks
-uv run python update_used_card_list.py list
-
-# Regenerate markdown output
-uv run python update_used_card_list.py export
-
-# Remove all decks and archive the markdown file
-uv run python update_used_card_list.py remove-all
+uv run python update_used_card_list.py swudb_lists/twin_suns_lists.md
 ```
 
-**Features:**
-- Tracks cards across multiple decks with quantity per deck
-- Supports both Premier and Twin Suns deck formats (auto-detected from API)
-- Includes main deck and sideboard cards
-- Groups cards by set, sorted by card number
-- Shows total quantity and per-deck breakdown
+The input file has one SWUDB deck URL per line — plain URLs or markdown bullets like `- [Name](https://swudb.com/deck/...)` both work. Blank lines and `#` comments are skipped.
 
-**Output files:**
-- `card_data/cards_in_use.db` - SQLite database storing decks and cards
-- `swudb_lists/cards_in_use.md` - Markdown summary (auto-generated on add/remove)
+**Outputs** (named after the input file):
+- `card_data/<stem>.db` — SQLite database of the decks and every card they use (main + sideboard)
+- `<input dir>/<stem>-report.md` — per-deck summary table: name, format, leaders, base, aspects, card count (no full card lists)
 
-**Output format:**
-```
-## Tracked Decks (2)
-- [1] [Deck Name](url) (Premier)
-- [2] [Other Deck](url) (Twin Suns)
+Each run rebuilds the grouping from scratch, so edit the list file and re-run to stay in sync.
 
-## Cards (N unique)
-Format: `- NUMBER: Card Name (xTOTAL) [DECK:QTY, ...]`
+**Format detection:** SWUDB has no Eternal format code (its enum is 1=Premier, 2=Twin Suns, 3=Trilogy) — Eternal decks are saved as Premier. Decks saved as Premier are therefore classified by legality: Premier-legal → `Premier`, otherwise Eternal-legal → `Eternal`, otherwise `Premier (illegal)`.
 
-### SOR (X cards)
-- 134: Ruthless Raider (x4) [1:1, 2:3]
+## Card Finder
+
+The `find_card.py` script answers "which of my decks is this card in?" across every grouping database.
+
+**Usage:**
+```bash
+uv run python find_card.py ash 199                    # set + number
+uv run python find_card.py law 117 --db premier_lists # one grouping only
+uv run python find_card.py --list                     # show available databases
 ```
 
-The `[1:1, 2:3]` means: 1 copy in deck 1, 3 copies in deck 2 (4 total).
+**Output:**
+```
+LAW 117: Conveyex Security Captain
+Inventory: 4 in binder; extras (if any) in bulk/trade boxes (synced 2026-07-22 23:25)
+
+premier_lists:
+  DJ +10,000 IQ Combo v7.12 (Premier) — 2 side
+
+twin_suns_lists:
+  TS - You are mine now. (Twin Suns) — 1 main
+
+Total copies in use: 3
+```
+
+## Inventory Snapshot
+
+`sync_inventory.py` copies the spreadsheet's owned counts (column C of each set tab) into `card_data/inventory.db`, so `find_card.py` can show what you own without hitting the Google Sheets API.
+
+```bash
+uv run python sync_inventory.py            # every set tab
+uv run python sync_inventory.py law ash    # specific sets
+```
+
+**Count semantics:** the sheet tracks copies stored in the collection binders, up to a playset of 4. A count under 4 means that's every copy and it's in the binder; 4+ means the binder playset is full and any extras live (untracked) in the bulk/trade boxes. Blank cells mean the card isn't tracked. Re-run after updating counts in the sheet — `find_card.py` shows the sync date so stale data is visible.
+
+**Variant codes (column E):** hand-entered codes track owned variant printings — `P1` non-foil prestige, `P2` foil prestige, `P3(serial)` serialized (e.g. `1xP3(127/250)`), `S` showcase, plus assorted judge/prize codes. The sync stores them and `find_card.py` decodes the known ones:
+
+```
+LOF 234: Darth Malak - Covetous Apprentice
+Inventory: 3 in binder (synced 2026-07-22 23:47)
+Variants owned: 2× Prestige Foil, 1× Serialized (127/250)
+```
+
+`update_prices.py` also stamps each set tab with a "Prices Updated:" timestamp in J1/K1, which the sync copies into the snapshot.
 
 ## Deck Format Validator
 
