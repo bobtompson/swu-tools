@@ -5,31 +5,37 @@ import os
 import pandas as pd
 import requests
 
-# Main booster / premier-legal sets in release order. IBH (Intro Battle: Hoth,
-# Oct 2025) and IC27 (Icons 2027 Edition, 11/20/26) are supplemental products
-# but Premier-legal, so they live here rather than in SPECIAL_SETS.
-# "Homeworlds" (main set after ASH, Oct 2026) joins between ash and ic27 once
-# its code is announced — it releases before IC27.
-MAIN_SETS = ['sor', 'shd', 'twi', 'jtl', 'lof', 'ibh', 'sec', 'law', 'ash', 'ic27']
+# Main numbered booster sets in release order — "set 1" (SOR) through "set 9"
+# (HMW, HomeWorlds, 10/18/26). Supplemental products go in SUB_SETS instead.
+# 2027 sets teased at Worlds 2026 (codes TBD), in timeline order: Legacy of
+# Skywalker (set 10), System Overload, Icons 2028 (a sub set, likely IC28),
+# Galaxy at War. Also announced: starting with set 10, every main set ships
+# with two Twin Suns decks, following the TS26 model — the sub set code holds
+# only the new Twin Suns-exclusive cards (Premier-excluded, like TS26), and
+# the rest of each deck is reprints carrying their own sets' codes.
+MAIN_SETS = ['sor', 'shd', 'twi', 'jtl', 'lof', 'sec', 'law', 'ash', 'hmw']
 
-# Supplemental product set codes (legal in Twin Suns / Eternal only)
-SPECIAL_SETS = ['ts26']
+# Sub sets — supplemental products between main sets, in release order.
+# IBH (Intro Battle: Hoth, 10/3/25) and IC27 (Icons 2027 Edition, 11/20/26)
+# are Premier-legal; TS26 (Twin Suns 2026 pre-con cards, 5/8/26) is
+# Twin Suns / Eternal only. Premier legality lives in the PREMIER_* sets below.
+SUB_SETS = ['ibh', 'ts26', 'ic27']
 
 # Supported set abbreviations for card lookups
-VALID_SETS = MAIN_SETS + SPECIAL_SETS
+VALID_SETS = MAIN_SETS + SUB_SETS
 
 # Uppercase versions for scripts that work with SWUDB deck/set identifiers
 MAIN_SETS_UPPER = [set_name.upper() for set_name in MAIN_SETS]
-SPECIAL_SETS_UPPER = [set_name.upper() for set_name in SPECIAL_SETS]
+SUB_SETS_UPPER = [set_name.upper() for set_name in SUB_SETS]
 VALID_SETS_UPPER = [set_name.upper() for set_name in VALID_SETS]
 
 # Directory for cached card data
 CACHE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'card_data')
 
 # Threshold (in card count) above which a parent-less set is considered a
-# "main" release rather than a promo / convention / store-showdown product.
-# Captures main booster sets (~250+ cards), TS26 (84), and IBH (104); excludes
-# promo bundles (≤48 cards).
+# main-class release (main set or sub set) rather than a promo / convention /
+# store-showdown product. Captures main booster sets (~250+ cards), TS26 (84),
+# and IBH (104); excludes promo bundles (≤48 cards).
 MAIN_SET_CARD_THRESHOLD = 80
 
 # ===== Format legality =====
@@ -40,12 +46,14 @@ MAIN_SET_CARD_THRESHOLD = 80
 # Promo/OP-set parent inheritance and the pre-release auto-flip are derived by
 # set_legality() from the /sets catalog and today's date.
 
-# Currently Premier-legal main sets. Update on rotation events.
-PREMIER_LEGAL_MAIN_SETS = {"JTL", "LOF", "IBH", "SEC", "LAW"}
+# Currently Premier-legal sets (main sets and sub sets). Update on rotation:
+# JTL rotates out when Legacy of Skywalker (set 10, first 2027 set) releases —
+# the plan appears to be rotating the oldest Premier-legal set annually.
+PREMIER_LEGAL_SETS = {"JTL", "LOF", "IBH", "SEC", "LAW", "ASH"}
 
 # Upcoming sets that auto-flip Premier-legal at (release_date - PRERELEASE_DAYS).
-# After release, optionally move to PREMIER_LEGAL_MAIN_SETS for clarity.
-PREMIER_PENDING_SETS = {"ASH", "IC27"}
+# After release, optionally move to PREMIER_LEGAL_SETS for clarity.
+PREMIER_PENDING_SETS = {"HMW", "IC27"}
 
 # Sets explicitly rotated out of Premier (legal in Eternal / Twin Suns only).
 PREMIER_ROTATED_SETS = {"SOR", "SHD", "TWI"}
@@ -57,10 +65,16 @@ PREMIER_EXCLUDED_SETS = {"TS26"}
 PRERELEASE_DAYS = 7
 
 # Release-date overrides ("M/D/YY") for sets whose swu-db catalog date is wrong
-# or missing. ASH's full release is 7/17/26 (catalog says 7/27/26) ->
-# Premier-legal 7/10/26. IC27 releases 11/20/26 -> Premier-legal 11/13/26.
+# or missing. ASH released 7/17/26 (catalog says 7/27/26) — display-only now
+# that ASH is in PREMIER_LEGAL_SETS. HMW (HomeWorlds) releases 10/18/26 ->
+# Premier-legal 10/11/26. IC27 releases 11/20/26 -> Premier-legal 11/13/26.
 # TS26 released 5/8/26 (catalog says 7/11/26) — display-only, Premier-excluded.
-RELEASE_DATE_OVERRIDES = {"ASH": "7/17/26", "IC27": "11/20/26", "TS26": "5/8/26"}
+RELEASE_DATE_OVERRIDES = {
+    "ASH": "7/17/26",
+    "HMW": "10/18/26",
+    "IC27": "11/20/26",
+    "TS26": "5/8/26",
+}
 
 # Card-name bans in Premier (independent of set legality).
 PREMIER_SUSPENDED_CARDS = {
@@ -87,7 +101,8 @@ def fetch_remote_sets(timeout=30):
 
 
 def is_main_set(set_info):
-    """Heuristic for whether a /sets entry is a main release vs. a promo."""
+    """Heuristic for whether a /sets entry is a main-class release (main set
+    or sub set) vs. a promo."""
     if set_info.get('parentSetId'):
         return False
     return (set_info.get('numberCards') or 0) >= MAIN_SET_CARD_THRESHOLD
@@ -139,7 +154,7 @@ def set_legality(set_id, catalog, today=None):
     Logic:
         - Eternal and Twin Suns: every set is legal (no current rotation or bans).
         - Premier: legal if the set's effective parent (parentSetId or self) is
-          in PREMIER_LEGAL_MAIN_SETS, OR is in PREMIER_PENDING_SETS and today
+          in PREMIER_LEGAL_SETS, OR is in PREMIER_PENDING_SETS and today
           is within PRERELEASE_DAYS of that parent's release date.
         - Unknown sets (not in catalog): assumed Premier-illegal, Eternal/TS legal.
     """
@@ -159,7 +174,7 @@ def set_legality(set_id, catalog, today=None):
 
     if effective_parent in PREMIER_EXCLUDED_SETS or effective_parent in PREMIER_ROTATED_SETS:
         premier = False
-    elif effective_parent in PREMIER_LEGAL_MAIN_SETS:
+    elif effective_parent in PREMIER_LEGAL_SETS:
         premier = True
     elif effective_parent in PREMIER_PENDING_SETS:
         parent_info = next((s for s in catalog if s.get('setId') == effective_parent), info)

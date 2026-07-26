@@ -16,7 +16,7 @@ import requests
 
 from lib.swudb import (
     CACHE_DIR,
-    PREMIER_LEGAL_MAIN_SETS,
+    PREMIER_LEGAL_SETS,
     PREMIER_PENDING_SETS,
     PREMIER_ROTATED_SETS,
     PRERELEASE_DAYS,
@@ -151,7 +151,7 @@ def _run_list(show_all):
               f"{', '.join(new_main)}")
 
     # Warn about sets in VALID_SETS with no format-legality assignment.
-    assigned = (PREMIER_LEGAL_MAIN_SETS | PREMIER_PENDING_SETS
+    assigned = (PREMIER_LEGAL_SETS | PREMIER_PENDING_SETS
                 | PREMIER_ROTATED_SETS | {'TS26'})
     unassigned = sorted(set(VALID_SETS_UPPER) - assigned)
     if unassigned:

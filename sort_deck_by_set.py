@@ -5,11 +5,11 @@ import re
 from collections import defaultdict
 from datetime import datetime
 import requests
-from lib.swudb import MAIN_SETS_UPPER, SPECIAL_SETS_UPPER, VALID_SETS_UPPER
+from lib.swudb import MAIN_SETS_UPPER, SUB_SETS_UPPER, VALID_SETS_UPPER
 import validate_deck_format as vdf
 
 # Ordered sets for output. Main sets stay first; supplemental sets follow.
-ORDERED_SETS = MAIN_SETS_UPPER + SPECIAL_SETS_UPPER
+ORDERED_SETS = MAIN_SETS_UPPER + SUB_SETS_UPPER
 
 # Deck format mapping
 DECK_FORMATS = {
@@ -193,9 +193,9 @@ def select_primary_set(set_codes):
         if set_abbr in MAIN_SETS_UPPER:
             return (set_abbr, num)
 
-    # Then prefer known supplemental product sets over promos
+    # Then prefer sub sets (supplemental products) over promos
     for set_abbr, num in set_codes:
-        if set_abbr in SPECIAL_SETS_UPPER:
+        if set_abbr in SUB_SETS_UPPER:
             return (set_abbr, num)
 
     # Fall back to first listed if no main set found

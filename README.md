@@ -15,7 +15,7 @@ Note: If you are not sure how to do this. ChatGPT generated a step by step how-t
 
 ## Files
 - `main.py` will download card lists as json from a swudb api into a pandas dataframe. It then will pull cards names and rarity into the columns I specify.
-- `./lib/swudb.py` library functions to pull card lists based on set abbreviation name `SOR, SHD, TWI, JTL, LOF, SEC, LAW`, plus `TS26` for Twin Suns 2026 deck cards
+- `./lib/swudb.py` library functions to pull card lists based on set abbreviation name `SOR, SHD, TWI, JTL, LOF, IBH, SEC, LAW, ASH, HMW, IC27`, plus `TS26` for Twin Suns 2026 deck cards
 - `./card_data/` cached JSON files for each set (loaded before hitting the API)
 - `lookup_card.py` Start of a card lookup script, should pull all info of a card based on set and card number and print it to console.
 - `sort_deck_by_set.py` Takes a deck list and outputs cards sorted by set. Useful for gathering cards from binders organized by set.
@@ -48,7 +48,7 @@ uv run python sort_deck_by_set.py "path/to/decklist.txt"
 
 **Features:**
 - Supports Picklist (.txt) and JSON (.json) deck formats from swudb.com
-- Groups cards by set (SOR, SHD, TWI, JTL, LOF, SEC, LAW, then TS26), sorted by card number
+- Groups cards by set (main sets in release order, then TS26), sorted by card number
 - Prefers main sets over promo printings for cards in multiple sets
 - Shows alternate sets for reprints (e.g., "also in: P25, LOFP")
 - Tags TS26 cards with the pre-con deck(s) they came from (e.g., `[from: Blood Brothers]`), since TS26 cards exist only in the four pre-constructed Twin Suns decks and not in any collectable set. A card shared across multiple pre-cons lists each one. Sourced from `card_data/ts26_decks.json`.
@@ -242,13 +242,13 @@ All set lists and format-legality rules live in **`lib/swudb.py`**. The `refresh
 
 ### Configuration knobs
 
-Six constants you'll edit over time, all near the top of `lib/swudb.py`:
+The constants you'll edit over time, all near the top of `lib/swudb.py`. `MAIN_SETS` holds the main numbered booster sets ("set 1" SOR through "set 9" HMW); `SUB_SETS` holds supplemental products (which people don't count as numbered sets). Premier legality is orthogonal — it lives entirely in the `PREMIER_*` sets, which mix main and sub sets:
 
 ```python
-MAIN_SETS               = ['sor', 'shd', 'twi', 'jtl', 'lof', 'ibh', 'sec', 'law']
-SPECIAL_SETS            = ['ts26']
-PREMIER_LEGAL_MAIN_SETS = {"JTL", "LOF", "IBH", "SEC", "LAW"}
-PREMIER_PENDING_SETS    = {"ASH"}        # auto-flips Premier-legal at release - 7 days
+MAIN_SETS               = ['sor', 'shd', 'twi', 'jtl', 'lof', 'sec', 'law', 'ash', 'hmw']
+SUB_SETS                = ['ibh', 'ts26', 'ic27']  # supplemental products, release order
+PREMIER_LEGAL_SETS      = {"JTL", "LOF", "IBH", "SEC", "LAW", "ASH"}
+PREMIER_PENDING_SETS    = {"HMW", "IC27"}  # auto-flip Premier-legal at release - 7 days
 PREMIER_ROTATED_SETS    = {"SOR", "SHD", "TWI"}
 PREMIER_EXCLUDED_SETS   = {"TS26"}       # main-class but never Premier-legal
 PREMIER_SUSPENDED_CARDS = {...}          # card-name bans, independent of set legality
@@ -256,21 +256,22 @@ PREMIER_SUSPENDED_CARDS = {...}          # card-name bans, independent of set le
 
 Everything else — Eternal and Twin Suns legality (currently no rotation or bans), promo / OP / prerelease parent inheritance, and the pre-release auto-flip — is derived automatically by `set_legality()` from the `/sets` API catalog and today's date.
 
-`MAIN_SETS` / `SPECIAL_SETS` lowercase entries drive cache file naming and the `VALID_SETS` allowlist used by `refresh_cache.py`. The four `PREMIER_*` sets drive what `validate_deck_format.py` accepts.
+`MAIN_SETS` / `SUB_SETS` lowercase entries drive cache file naming, sort/display order, and the `VALID_SETS` allowlist used by `refresh_cache.py`. The four `PREMIER_*` sets drive what `validate_deck_format.py` accepts.
 
 ### Common scenarios
 
-**A new main set gets announced (e.g., Home Worlds).** Wait until the set ID appears in the SWUDB API (`refresh_cache.py --list` will warn "Main-class set(s) not in VALID_SETS"). Then:
-1. Add the lowercase set ID to `MAIN_SETS` in release-date order.
+**A new main set gets announced (e.g., `HMW` — HomeWorlds, 10/18/26).** The set ID can be added before it appears in the SWUDB API (`refresh_cache.py --list` warns "Main-class set(s) not in VALID_SETS" once the catalog knows it):
+1. Add the lowercase set ID to `MAIN_SETS` (numbered main set) or `SUB_SETS` (supplemental product) in release-date order.
 2. Add the uppercase ID to `PREMIER_PENDING_SETS`.
+3. If the catalog date is missing or wrong, add the announced date to `RELEASE_DATE_OVERRIDES` so the pre-release auto-flip works.
 
-**A pending set passes its pre-release threshold (e.g., `ASH` on 2026-07-20).** No action required — `set_legality()` auto-flips it Premier-legal. As a one-line cleanup, move the ID from `PREMIER_PENDING_SETS` to `PREMIER_LEGAL_MAIN_SETS` so the data matches reality.
+**A pending set passes its pre-release threshold (e.g., `ASH` on 2026-07-10).** No action required — `set_legality()` auto-flips it Premier-legal. As a one-line cleanup, move the ID from `PREMIER_PENDING_SETS` to `PREMIER_LEGAL_SETS` so the data matches reality (done for `ASH` on 2026-07-26).
 
-**A set rotates out of Premier.** Move the ID from `PREMIER_LEGAL_MAIN_SETS` to `PREMIER_ROTATED_SETS`. Cards from that set still pass Premier validation if their name appears in any set still in `PREMIER_LEGAL_MAIN_SETS` (the reprint rule).
+**A set rotates out of Premier.** Move the ID from `PREMIER_LEGAL_SETS` to `PREMIER_ROTATED_SETS`. Cards from that set still pass Premier validation if their name appears in any set still in `PREMIER_LEGAL_SETS` (the reprint rule). Next expected: `JTL` rotates when Legacy of Skywalker (set 10) releases in 2027 — the announced plan appears to be rotating the oldest Premier-legal set annually.
 
-**A reprint set drops (speculated *Icons*).** Add its ID to both `MAIN_SETS` and `PREMIER_LEGAL_MAIN_SETS`. The reprint-name logic in `validate_deck_format.py` automatically re-enables any same-named rotated cards in Premier.
+**A reprint sub set drops (like `IC27`, and Icons 2028 after it).** Add its ID to `SUB_SETS` and `PREMIER_PENDING_SETS` (or straight to `PREMIER_LEGAL_SETS` if it's already out). The reprint-name logic in `validate_deck_format.py` automatically re-enables any same-named rotated cards in Premier.
 
-**A supplemental set is Twin-Suns / Eternal only (like `TS26`).** Add the lowercase ID to `SPECIAL_SETS` and the uppercase ID to `PREMIER_EXCLUDED_SETS`.
+**A supplemental set is Twin-Suns / Eternal only (like `TS26`).** Add the lowercase ID to `SUB_SETS` and the uppercase ID to `PREMIER_EXCLUDED_SETS`.
 
 **Promo / OP / prerelease sets (`JTLOP`, `LAWOP`, `P26`, etc.).** No action needed. `set_legality()` follows `parentSetId` from `/sets` and inherits the parent's Premier legality automatically.
 

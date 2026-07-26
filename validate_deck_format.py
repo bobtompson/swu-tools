@@ -25,7 +25,7 @@ DECK_FORMATS = {
 # Format-legality constants and rules live in lib/swudb.py — single source of
 # truth for set lists, rotation, pre-release flips, and suspensions.
 from lib.swudb import (  # noqa: E402
-    PREMIER_LEGAL_MAIN_SETS,
+    PREMIER_LEGAL_SETS,
     PREMIER_SUSPENDED_CARDS,
     get_sets_catalog,
     set_legality,
@@ -185,14 +185,26 @@ def detect_deck_type(deck):
 
 
 def get_premier_reprint_names():
-    """Build a set of full card names available in Premier-legal main sets."""
+    """Build the set of full card names printed in Premier-legal sets.
+
+    Names use format_card_name's "Name - Subtitle" shape (lowercased) so
+    unique cards match their reprints — a reprint shares both name and
+    subtitle (e.g. Chopper Base - Atollon, SOR 030 reprinted as JTL 029).
+    """
     premier_names = set()
-    for set_abbr in PREMIER_LEGAL_MAIN_SETS:
+    for set_abbr in PREMIER_LEGAL_SETS:
         set_df = swudb.get_swu_list(set_abbr.lower())
         if set_df is None:
             continue
-        for card_name in set_df["Name"].dropna().tolist():
-            premier_names.add(str(card_name).strip().lower())
+        for _, row in set_df.iterrows():
+            name = row.get("Name")
+            if not isinstance(name, str) or not name.strip():
+                continue
+            subtitle = row.get("Subtitle")
+            # A missing Subtitle is NaN, which is truthy — hence isinstance.
+            subtitle = subtitle.strip() if isinstance(subtitle, str) else ""
+            full_name = f"{name.strip()} - {subtitle}" if subtitle else name.strip()
+            premier_names.add(full_name.lower())
     return premier_names
 
 

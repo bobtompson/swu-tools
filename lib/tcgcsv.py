@@ -14,7 +14,8 @@ CATEGORY_ID = 79  # Star Wars: Unlimited
 BASE_URL = 'https://tcgcsv.com/tcgplayer'
 
 # TCGplayer (groupId, display name) for each supported set abbreviation.
-# IC27 is not on TCGplayer yet; add it here once it gets a group.
+# HMW and IC27 are not on TCGplayer yet; add them here once they get groups
+# (list groups with: curl https://tcgcsv.com/tcgplayer/79/groups).
 GROUPS = {
     'sor': (23405, 'Spark of Rebellion'),
     'shd': (23488, 'Shadows of the Galaxy'),
