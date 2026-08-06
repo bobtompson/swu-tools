@@ -12,7 +12,8 @@ scratch, so re-run after editing the list to stay in sync.
 Outputs, named after the input file:
   - card_data/<stem>.db          SQLite database of decks and their cards
   - <input dir>/<stem>-report.md per-deck summary (name, format, leaders,
-                                 base, aspects, card counts) — no card lists
+                                 base, aspects, card counts) plus a combined
+                                 card list grouped by set across all decks
 
 Use find_card.py to look up which decks in these databases use a card.
 """
@@ -28,8 +29,13 @@ import requests
 
 import validate_deck_format as vdf
 from lib.deck_source import card_identity, load_deck
+from lib.swudb import MAIN_SETS_UPPER, SUB_SETS_UPPER
 
 CARD_DATA_DIR = os.path.join(os.path.dirname(__file__), 'card_data')
+
+# Set ordering for the report's card list: main sets first, then sub sets;
+# anything else (promos etc.) sorts alphabetically after these.
+ORDERED_SETS = MAIN_SETS_UPPER + SUB_SETS_UPPER
 
 DECK_URL_RE = re.compile(r'https?://(?:www\.)?swudb\.com/deck/[A-Za-z0-9]+')
 
@@ -42,14 +48,20 @@ def parse_url_list(path):
     """Extract SWUDB deck URLs from a list file, one per line.
 
     Blank lines and lines starting with '#' are skipped. Duplicate URLs
-    are dropped (first occurrence wins). Returns (urls, skipped_lines).
+    are dropped (first occurrence wins). If line 1 is a markdown heading
+    ('# Title'), its text is captured as the list's description.
+    Returns (urls, skipped_lines, description).
     """
     urls = []
     seen = set()
     skipped = []
+    description = None
     with open(path, 'r', encoding='utf-8') as f:
         for line_no, raw in enumerate(f, 1):
             line = raw.strip()
+            if line_no == 1 and line.startswith('#'):
+                description = line.lstrip('#').strip() or None
+                continue
             if not line or line.startswith('#'):
                 continue
             match = DECK_URL_RE.search(line)
@@ -62,7 +74,7 @@ def parse_url_list(path):
                 continue
             seen.add(url)
             urls.append(url)
-    return urls, skipped
+    return urls, skipped, description
 
 
 def classify_format(deck, premier_names):
@@ -86,10 +98,17 @@ def classify_format(deck, premier_names):
     return f'Unknown (code {code})'
 
 
+def name_with_set(card_data):
+    """Card name suffixed with its set abbreviation, e.g. 'Colossus (SHD)'."""
+    name = vdf.format_card_name(card_data)
+    set_abbr, _ = card_identity(card_data)
+    return f'{name} ({set_abbr})' if set_abbr else name
+
+
 def summarize_deck(deck, url, premier_names):
     """Reduce a normalized deck to the summary row stored and reported."""
-    leaders = [vdf.format_card_name(c) for c in deck['leaders']]
-    base = vdf.format_card_name(deck['base']) if deck['base'] else ''
+    leaders = [name_with_set(c) for c in deck['leaders']]
+    base = name_with_set(deck['base']) if deck['base'] else ''
     return {
         'deck_id': vdf.extract_deck_id(url),
         'title': deck['title'],
@@ -204,11 +223,60 @@ def store_deck(conn, deck, summary):
     conn.commit()
 
 
-def write_report(report_path, list_path, summaries, failures, skipped):
+def fetch_cards_by_set(conn):
+    """Aggregate card usage across all stored decks, grouped by set.
+
+    Returns {set_abbr: [card, ...]} where each card dict has number, name,
+    total_qty (main + side across all decks), side_qty, and per_deck — a
+    list of (deck_number, qty) with deck_number matching the report table's
+    '#' column — sorted by card number within each set.
+    """
+    cursor = conn.cursor()
+    # Decks were inserted in report order, so ascending id = table '#'.
+    cursor.execute('SELECT id FROM decks ORDER BY id')
+    deck_numbers = {row['id']: idx for idx, row in enumerate(cursor, 1)}
+
+    cursor.execute('''
+        SELECT c.set_abbr, c.number, c.name,
+               dc.deck_id, dc.main_qty, dc.side_qty
+        FROM cards c
+        JOIN deck_cards dc ON dc.card_id = c.id
+        ORDER BY c.set_abbr, c.number, dc.deck_id
+    ''')
+    grouped = {}
+    cards = {}  # (set_abbr, number) -> card dict
+    for row in cursor.fetchall():
+        key = (row['set_abbr'], row['number'])
+        card = cards.get(key)
+        if card is None:
+            card = cards[key] = {
+                'number': row['number'],
+                'name': row['name'],
+                'total_qty': 0,
+                'side_qty': 0,
+                'per_deck': [],
+            }
+            grouped.setdefault(row['set_abbr'], []).append(card)
+        qty = row['main_qty'] + row['side_qty']
+        card['total_qty'] += qty
+        card['side_qty'] += row['side_qty']
+        card['per_deck'].append((deck_numbers[row['deck_id']], qty))
+    return grouped
+
+
+def order_sets(set_abbrs):
+    """Order set codes: main sets, then sub sets, then unknowns alphabetically."""
+    known = [s for s in ORDERED_SETS if s in set_abbrs]
+    unknown = sorted(s for s in set_abbrs if s not in ORDERED_SETS)
+    return known + unknown
+
+
+def write_report(report_path, list_path, summaries, failures, skipped,
+                 cards_by_set, description=None):
     """Write the per-deck markdown summary report."""
     stem = os.path.splitext(os.path.basename(list_path))[0]
     lines = [
-        f'# Deck Report: {stem}',
+        f'# Deck Report: {description or stem}',
         '',
         f'Source: `{list_path}` — generated {datetime.now().strftime("%Y-%m-%d %H:%M")}',
         '',
@@ -225,6 +293,28 @@ def write_report(report_path, list_path, summaries, failures, skipped):
             f"| {idx} | [{s['title']}]({s['url']}) | {s['format']} "
             f"| {s['leaders']} | {s['base']} | {s['aspects']} | {cards} |"
         )
+
+    if cards_by_set:
+        distinct = sum(len(rows) for rows in cards_by_set.values())
+        lines += ['', f'## Cards by Set ({distinct})', '']
+        lines.append('Total copies are summed across every deck above '
+                     '(main + sideboard); the breakdown in parentheses is '
+                     "copies:deck#, matching the table's # column.")
+        for set_abbr in order_sets(cards_by_set.keys()):
+            rows = cards_by_set[set_abbr]
+            copies = sum(r['total_qty'] for r in rows)
+            lines += ['', f'### {set_abbr} ({len(rows)} cards, {copies} copies)', '']
+            for r in rows:
+                line = f"- {r['number']}: {r['name']}"
+                if r['total_qty'] > 1:
+                    line += f" ×{r['total_qty']}"
+                per_deck = ', '.join(f'{qty}:{deck_no}'
+                                     for deck_no, qty in r['per_deck'])
+                line += f" ({per_deck}"
+                if r['side_qty']:
+                    line += f"; {r['side_qty']} in sideboards"
+                line += ')'
+                lines.append(line)
 
     if failures:
         lines += ['', f'## Failed to fetch ({len(failures)})', '']
@@ -247,7 +337,7 @@ def build_grouping(list_path):
         print(f"Error: List file not found: {list_path}")
         return False
 
-    urls, skipped = parse_url_list(list_path)
+    urls, skipped, description = parse_url_list(list_path)
     for line_no, text in skipped:
         print(f"  Line {line_no}: no deck URL found, skipped: {text}")
     if not urls:
@@ -279,10 +369,12 @@ def build_grouping(list_path):
             summaries.append(summary)
             print(f"  {summary['title']} ({summary['format']}) — "
                   f"{summary['leaders']}")
+        cards_by_set = fetch_cards_by_set(conn)
     finally:
         conn.close()
 
-    write_report(report_path, list_path, summaries, failures, skipped)
+    write_report(report_path, list_path, summaries, failures, skipped,
+                 cards_by_set, description)
 
     print(f"\nDatabase: {db_path}")
     print(f"Report:   {report_path}")
