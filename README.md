@@ -260,7 +260,7 @@ Everything else — Eternal and Twin Suns legality (currently no rotation or ban
 
 ### Common scenarios
 
-**A new main set gets announced (e.g., `HMW` — HomeWorlds, 10/18/26).** The set ID can be added before it appears in the SWUDB API (`refresh_cache.py --list` warns "Main-class set(s) not in VALID_SETS" once the catalog knows it):
+**A new main set gets announced (e.g., `HMW` — Homeworlds, 10/9/26).** The set ID can be added before it appears in the SWUDB API (`refresh_cache.py --list` warns "Main-class set(s) not in VALID_SETS" once the catalog knows it):
 1. Add the lowercase set ID to `MAIN_SETS` (numbered main set) or `SUB_SETS` (supplemental product) in release-date order.
 2. Add the uppercase ID to `PREMIER_PENDING_SETS`.
 3. If the catalog date is missing or wrong, add the announced date to `RELEASE_DATE_OVERRIDES` so the pre-release auto-flip works.

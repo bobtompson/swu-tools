@@ -6,7 +6,7 @@ import pandas as pd
 import requests
 
 # Main numbered booster sets in release order — "set 1" (SOR) through "set 9"
-# (HMW, HomeWorlds, 10/18/26). Supplemental products go in SUB_SETS instead.
+# (HMW, Homeworlds, 10/9/26). Supplemental products go in SUB_SETS instead.
 # 2027 sets teased at Worlds 2026 (codes TBD), in timeline order: Legacy of
 # Skywalker (set 10), System Overload, Icons 2028 (a sub set, likely IC28),
 # Galaxy at War. Also announced: starting with set 10, every main set ships
@@ -66,12 +66,12 @@ PRERELEASE_DAYS = 7
 
 # Release-date overrides ("M/D/YY") for sets whose swu-db catalog date is wrong
 # or missing. ASH released 7/17/26 (catalog says 7/27/26) — display-only now
-# that ASH is in PREMIER_LEGAL_SETS. HMW (HomeWorlds) releases 10/18/26 ->
-# Premier-legal 10/11/26. IC27 releases 11/20/26 -> Premier-legal 11/13/26.
+# that ASH is in PREMIER_LEGAL_SETS. HMW (Homeworlds) releases 10/9/26 ->
+# Premier-legal 10/2/26. IC27 releases 11/20/26 -> Premier-legal 11/13/26.
 # TS26 released 5/8/26 (catalog says 7/11/26) — display-only, Premier-excluded.
 RELEASE_DATE_OVERRIDES = {
     "ASH": "7/17/26",
-    "HMW": "10/18/26",
+    "HMW": "10/9/26",
     "IC27": "11/20/26",
     "TS26": "5/8/26",
 }
