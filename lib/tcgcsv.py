@@ -27,6 +27,13 @@ GROUPS = {
     'law': (24572, 'A Lawless Time'),
     'ash': (24660, 'Ashes of the Empire'),
     'ts26': (24622, 'Twin Suns'),
+    # TCGplayer has two groups abbreviated P26; this one holds the TS26
+    # leader showcases (prize wall, 133-140). The other, 'Sector and Regional
+    # Promos: Season 2' (24854), isn't needed yet.
+    'p26': (24784, 'Galactic Championship 2026'),
+    # swu-db's P25 cards live in TCGplayer's catch-all Organized Play Promos
+    # group; only used for SOR's Luke / Vader showcases (73, 74)
+    'p25': (23455, 'Organized Play Promos'),
 }
 
 
@@ -44,6 +51,10 @@ NUMBER_FIXES = {
                  # Pykes' number); swu-db has it at 056
     679523: 63,  # TS26 Rex's DC-17s: mislabeled 83/64 (Take Aim's number);
                  # swu-db has it at 063
+    646496: 73,  # P25 Luke Skywalker 'Faithful Friend' showcase: mislabeled 72
+                 # (Kylo Ren's number) in Organized Play Promos; swu-db has 73
+    646497: 74,  # P25 Darth Vader 'Dark Lord of the Sith' showcase: mislabeled
+                 # 73; swu-db has 74
 }
 
 # tcgcsv.com returns 401 for the default python-requests user agent
@@ -195,6 +206,42 @@ def get_variant_list(set_name, tag, timeout=30):
 
     variants.sort(key=lambda s: s['number'])
     return variants
+
+
+def get_cards_by_number(set_name, numbers, timeout=30):
+    """Get specific cards of a set by number, preferring the Foil price.
+
+    For foil-only printings (showcases) that TCGplayer doesn't tag in the
+    product name, e.g. the P26 prize wall leaders. Sellers list some of
+    these under Normal too, so Normal is used only when Foil has no market
+    price. Same entry shape as get_variant_list, with the product name
+    minus its '(Prize Wall)'-style qualifiers. Returns None on failure.
+    """
+    data = _fetch_group_data(set_name, timeout)
+    if data is None:
+        return None
+    products, by_product = data
+    wanted = {int(n) for n in numbers}
+
+    cards = []
+    for product in products:
+        number = _card_number(product)
+        if number not in wanted:
+            continue
+        printings = by_product.get(product['productId'], {})
+        foil = printings.get('Foil') or {}
+        price = foil if foil.get('marketPrice') is not None else (
+            printings.get('Normal') or foil)
+        cards.append({
+            'number': f'{number:03d}',
+            'name': _front_name(product['name']),
+            'product_id': product['productId'],
+            'market': price.get('marketPrice'),
+            'low': price.get('lowPrice'),
+        })
+
+    cards.sort(key=lambda c: c['number'])
+    return cards
 
 
 def get_showcase_list(set_name, timeout=30):

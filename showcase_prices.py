@@ -1,6 +1,9 @@
 """Show TCGplayer prices for showcase variants (collector leader printings).
 
-Every main set has one showcase printing per leader (foil-only). By default
+Every main set has one showcase printing per leader (foil-only). A few
+leader showcases were printed in yearly promo sets instead (PROMO_SHOWCASES):
+SOR's Luke / Vader in P25 and the TS26 pre-con leaders in P26. They list with
+Source "P25 Showcase" / "P26 Showcase" and the original set's number. By default
 this prints a per-set price list to console. With --update-sheet it also
 writes the list to the "Collector" tab of the inventory spreadsheet,
 preserving the hand-entered Count column and any rows it doesn't manage
@@ -13,6 +16,7 @@ a faster, prices-only run.
 Usage:
     uv run python showcase_prices.py                 # all main sets, console only
     uv run python showcase_prices.py law ash         # specific sets
+    uv run python showcase_prices.py p25 p26         # promo-set showcases (SOR Luke/Vader, TS26 leaders; 'ts26' = p26)
     uv run python showcase_prices.py --no-listings   # skip availability lookups
     uv run python showcase_prices.py --update-sheet  # also update the Collector tab
 """
@@ -28,6 +32,13 @@ HEADER_ROWS = 2  # row 1 title, row 2 column headers; data starts at row 3
 # Collector tab columns: A Card Num., B Card Name, C Count,
 # D Original Card Number, E Source, F Current Price
 COL_NUM, COL_NAME, COL_COUNT, COL_ORIGINAL, COL_SOURCE, COL_PRICE = range(6)
+
+# Leader showcases printed in yearly promo sets instead of their own set:
+# promo set -> set holding the originals. Both are swu-db set ids; the promo
+# set also needs a tcgcsv.GROUPS entry for its TCGplayer group.
+#   P25: SOR's ultra-rare Luke / Vader showcases (not in TCGplayer's SOR group)
+#   P26: the TS26 pre-con leaders' prize wall showcases
+PROMO_SHOWCASES = {'p25': 'sor', 'p26': 'ts26'}
 
 
 def original_card_number(set_df, variant_number):
@@ -54,6 +65,49 @@ def original_card_number(set_df, variant_number):
     return min(same['Number'], key=int)
 
 
+def collect_promo_showcases(promo_set):
+    """Leader showcases from a promo set (see PROMO_SHOWCASES).
+
+    TCGplayer doesn't tag these '(Showcase)', so they're found in swu-db's
+    promo set (Leader + VariantType Showcase) and matched to their original
+    by Name+Subtitle; prices come from TCGplayer by promo card number.
+    Returns a list of entries like collect_showcases, or None on failure.
+    """
+    original_set = PROMO_SHOWCASES[promo_set]
+    promo_df = swudb.get_swu_list(promo_set, allow_unknown=True)
+    original_df = swudb.get_swu_list(original_set)
+    if promo_df is None or original_df is None:
+        return None
+
+    def card_key(card):
+        subtitle = card['Subtitle'] if isinstance(card['Subtitle'], str) else ''
+        return card['Name'], subtitle
+
+    # Sub set caches store unpadded numbers ('8'); pad to match the sheet
+    leaders = {card_key(card): str(card['Number']).zfill(3)
+               for _, card in original_df[original_df['Type'] == 'Leader'].iterrows()}
+    showcases = promo_df[(promo_df['Type'] == 'Leader')
+                         & (promo_df['VariantType'] == 'Showcase')]
+    originals = {str(card['Number']).zfill(3): leaders[card_key(card)]
+                 for _, card in showcases.iterrows()
+                 if card_key(card) in leaders}
+    if not originals:
+        print(f'Skipping {promo_set.upper()}: no {original_set.upper()} '
+              f'leader showcases found')
+        return None
+
+    entries = tcgcsv.get_cards_by_number(promo_set, originals)
+    if entries is None:
+        return None
+    for entry in entries:
+        entry['original'] = originals[entry['number']]
+    missing = sorted(set(originals) - {e['number'] for e in entries})
+    if missing:
+        print(f"Warning: {promo_set.upper()} showcases not on TCGplayer: "
+              f"{', '.join(missing)}")
+    return entries
+
+
 def collect_showcases(set_names):
     """Fetch showcase price lists per set. Returns {set_name: [entries]}.
 
@@ -63,6 +117,13 @@ def collect_showcases(set_names):
     results = {}
     for set_name in set_names:
         set_name = set_name.lower()
+        if set_name == 'ts26':
+            set_name = 'p26'  # TS26's only showcases are the P26 prize wall ones
+        if set_name in PROMO_SHOWCASES:
+            showcases = collect_promo_showcases(set_name)
+            if showcases:
+                results[set_name] = showcases
+            continue
         if set_name not in tcgcsv.GROUPS:
             print(f'Skipping {set_name.upper()}: no TCGplayer group known')
             continue
@@ -187,7 +248,7 @@ if __name__ == '__main__':
     if not with_stock:
         args.remove('--no-listings')
 
-    set_names = args or [s for s in swudb.MAIN_SETS if s in tcgcsv.GROUPS]
+    set_names = args or [s for s in swudb.MAIN_SETS if s in tcgcsv.GROUPS] + list(PROMO_SHOWCASES)
     showcases_by_set = collect_showcases(set_names)
     if not showcases_by_set:
         print('No showcase data found.')

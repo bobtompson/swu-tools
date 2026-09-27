@@ -24,7 +24,6 @@
       "name": "maul",
       "type": "Leader Unit",
       "decks": [
-        "Against the Odds / Improvised Tactics",
         "Blood Brothers"
       ]
     },
@@ -220,6 +219,7 @@
       "name": "maul",
       "type": "Unit",
       "decks": [
+        "Against the Odds / Improvised Tactics",
         "Blood Brothers"
       ]
     },
@@ -596,7 +596,6 @@
       "name": "barriss offee",
       "type": "Unit",
       "decks": [
-        "Against the Odds / Improvised Tactics",
         "Master and Apprentice"
       ]
     },

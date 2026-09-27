@@ -12,6 +12,15 @@ in the pre-cons and not in any collectable set). Each TS26 card number maps to
 the list of decks it appears in, since some TS26 cards are shared across
 multiple of the four decks while leaders/bases are exclusive to one.
 
+The source sheet has errors that were corrected by hand in the JSON after
+checking the deck lists at
+https://sw-unlimited-db.com/community/twin-suns-2026-precon-lists/ —
+rebuilding will undo these, so re-apply them:
+    003 Maul (leader)  Blood Brothers only (sheet also listed Against the Odds)
+    030 Maul (unit)    Against the Odds + Blood Brothers (sheet had BB only)
+    078 Barriss Offee  Master and Apprentice only (Against the Odds' Barriss is
+                       TWI 042 Unassuming Apprentice, not this TS26 card)
+
 Usage:
     uv run python build_ts26_decks.py /path/to/all_cards.csv
 """
@@ -73,6 +82,19 @@ def main():
     for deck in data["decks"]:
         count = sum(1 for c in cards.values() if deck in c["decks"])
         print(f"  {deck}: {count} TS26-exclusive cards")
+
+    # Leaders/bases are exclusive to one pre-con and each deck has exactly 2
+    # leaders. The source sheet has had errors here (e.g. TS26 003 Maul was
+    # listed in Against the Odds as well as Blood Brothers), so flag them.
+    for num, card in sorted(cards.items()):
+        if card["type"] in ("Leader Unit", "Base") and len(card["decks"]) > 1:
+            print(f"WARNING: {card['type']} {num} {card['name']} listed in "
+                  f"{len(card['decks'])} decks: {', '.join(card['decks'])}")
+    for deck in data["decks"]:
+        leaders = [n for n, c in cards.items()
+                   if c["type"] == "Leader Unit" and deck in c["decks"]]
+        if len(leaders) != 2:
+            print(f"WARNING: {deck} has {len(leaders)} leaders: {', '.join(leaders)}")
 
 
 if __name__ == "__main__":
