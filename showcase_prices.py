@@ -192,15 +192,18 @@ def print_showcases(showcases_by_set, with_stock):
         print(f'  set total: market {format_money(market_total)}')
 
 
-def update_collector_sheet(showcases_by_set):
-    """Write showcase rows to the Collector tab, preserving unmanaged data.
+def upsert_collector_rows(tab_name, entries, match_source=True):
+    """Write rows to a Collector-layout tab, preserving unmanaged data.
 
-    Existing rows are matched by (Card Num., Source) and updated in place —
-    the Count column and any rows this script doesn't manage are untouched.
-    New showcases are appended after the last used row. Reads formulas
-    (not rendered values) so writing the region back doesn't flatten them.
+    entries are dicts with number, name, original, source, market. Existing
+    rows are matched by (Card Num., Source) — or Card Num. alone when
+    match_source is False, for tabs holding a single set — and updated in
+    place; the Count column and any rows this script doesn't manage are
+    untouched. New entries are appended after the last used row. Reads
+    formulas (not rendered values) so writing the region back doesn't
+    flatten them.
     """
-    sheet = get_doc_sheet(COLLECTOR_TAB)
+    sheet = get_doc_sheet(tab_name)
     rows = sheet.get_values(f'A{HEADER_ROWS + 1}:F',
                             value_render_option='FORMULA')
     # Normalize to 6 columns so in-place updates can't index past a short row
@@ -210,33 +213,52 @@ def update_collector_sheet(showcases_by_set):
         # Card numbers can read back as 771, '771, or 010 — compare loosely
         return str(num).strip().lstrip("'").lstrip('0')
 
-    index = {(norm(row[COL_NUM]), str(row[COL_SOURCE]).strip()): i
-             for i, row in enumerate(rows)}
+    def key(num, source):
+        return (norm(num), str(source).strip()) if match_source else norm(num)
+
+    index = {key(row[COL_NUM], row[COL_SOURCE]): i
+             for i, row in enumerate(rows) if str(row[COL_NUM]).strip()}
 
     updated = appended = 0
-    for set_name, showcases in showcases_by_set.items():
-        source = f'{set_name.upper()} Showcase'
-        for s in showcases:
-            price = s['market'] if s['market'] is not None else ''
-            i = index.get((norm(s['number']), source))
-            if i is not None:
-                rows[i][COL_NAME] = s['name']
-                rows[i][COL_ORIGINAL] = f"'{s['original']}"
-                rows[i][COL_PRICE] = price
-                updated += 1
-            else:
-                # Leading apostrophes keep 3-digit numbers as text in Sheets
-                rows.append([f"'{s['number']}", s['name'], '',
-                             f"'{s['original']}", source, price])
-                appended += 1
+    for e in entries:
+        price = e['market'] if e['market'] is not None else ''
+        # Leading apostrophes keep 3-digit numbers as text in Sheets
+        original = f"'{e['original']}" if e['original'] else ''
+        i = index.get(key(e['number'], e['source']))
+        if i is not None:
+            rows[i][COL_NAME] = e['name']
+            rows[i][COL_ORIGINAL] = original
+            rows[i][COL_SOURCE] = e['source']
+            rows[i][COL_PRICE] = price
+            updated += 1
+        else:
+            rows.append([f"'{e['number']}", e['name'], '',
+                         original, e['source'], price])
+            appended += 1
 
     last_row = HEADER_ROWS + len(rows)
     sheet.update(rows, f'A{HEADER_ROWS + 1}:F{last_row}',
                  value_input_option='USER_ENTERED')
     sheet.format(f'F{HEADER_ROWS + 1}:F{last_row}',
                  {'numberFormat': {'type': 'CURRENCY', 'pattern': '$0.00'}})
-    print(f'\n{COLLECTOR_TAB} tab updated: {appended} rows added, '
+    print(f'\n{tab_name} tab updated: {appended} rows added, '
           f'{updated} prices refreshed')
+
+
+def update_collector_sheet(showcases_by_set):
+    """Write showcase rows to the Collector tab (Source 'LAW Showcase').
+
+    Original Card Number carries the set abbreviation ('LAW 045'); promo
+    showcases name the set holding the original ('P26 Showcase' -> 'TS26 001').
+    """
+    entries = []
+    for set_name, showcases in showcases_by_set.items():
+        original_set = PROMO_SHOWCASES.get(set_name, set_name).upper()
+        for s in showcases:
+            original = f"{original_set} {s['original']}" if s['original'] else ''
+            entries.append(dict(s, source=f'{set_name.upper()} Showcase',
+                                original=original))
+    upsert_collector_rows(COLLECTOR_TAB, entries)
 
 
 if __name__ == '__main__':

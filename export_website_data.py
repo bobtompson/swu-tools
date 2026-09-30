@@ -82,7 +82,10 @@ def main():
             print(f"{set_id.upper()}: no cache file — skipped (run refresh_cache.py {set_id})")
             continue
         cards = [prune_card(c) for c in rows]
-        base = sum(1 for c in rows if c.get('VariantType') == 'Normal')
+        # Tokens (HMW onward, numbered 'T01'...) aren't in the catalog's
+        # numberCards, so counting them would trip the site's staleness check
+        base = sum(1 for c in rows if c.get('VariantType') == 'Normal'
+                   and str(c.get('Number', '')).isdigit())
         out_path = os.path.join(args.out, f'{set_id.lower()}.json')
         with open(out_path, 'w', encoding='utf-8') as f:
             json.dump(cards, f, ensure_ascii=False, separators=(',', ':'))

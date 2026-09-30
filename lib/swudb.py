@@ -218,6 +218,16 @@ def save_to_cache(set_name, data):
         print(f"Warning: Could not save cache for {set_name.upper()}: {e}")
 
 
+def fetch_remote_cards(set_name, timeout=30):
+    """Fetch a set's card list (every printing) from the SWUDB API, bypassing
+    the cache. Returns a list of card dicts; raises requests.RequestException
+    or ValueError on failure."""
+    response = requests.get(f'https://api.swu-db.com/cards/{set_name.lower()}',
+                            timeout=timeout)
+    response.raise_for_status()
+    return response.json().get('data', [])
+
+
 def get_swu_list(set_name, force_refresh=False, allow_unknown=False):
     """
     Get card list for a set. Checks local cache first, then fetches from API.
@@ -245,14 +255,8 @@ def get_swu_list(set_name, force_refresh=False, allow_unknown=False):
         if cached_df is not None:
             return cached_df
 
-    # Fetch from API
-    url = f'https://api.swu-db.com/cards/{set_name}'
     try:
-        response = requests.get(url, timeout=30)
-        response.raise_for_status()
-
-        set_json = response.json()
-        card_data = set_json.get('data', [])
+        card_data = fetch_remote_cards(set_name)
 
         if not card_data:
             print(f"Warning: No card data returned for {set_name.upper()}")

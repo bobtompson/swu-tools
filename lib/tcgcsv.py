@@ -246,6 +246,51 @@ def get_cards_by_number(set_name, numbers, timeout=30):
     return cards
 
 
+def get_prices_by_product_id(product_ids, skip_group_ids=(), timeout=30):
+    """Look up TCGplayer products by productId across every SWU group.
+
+    swu-db carries a tcgplayerId on promo cards, and a yearly promo set is
+    spread over several TCGplayer groups (P26: Galactic Championship 2026,
+    Sector and Regional Promos Seasons 1-2, Judge / OP / Event Exclusive
+    Promos), so matching by id sidesteps group and number mismatches.
+    skip_group_ids avoids fetching groups known not to hold the products.
+    Returns {productId: {'name': str, 'printings': {subTypeName:
+    {'market': float|None, 'low': float|None}}}}; ids not found on
+    TCGplayer are absent. Returns None if the group list can't be fetched.
+    """
+    wanted = set(product_ids)
+    try:
+        groups = _fetch_results(f'{CATEGORY_ID}/groups', timeout)
+    except (requests.RequestException, KeyError, ValueError) as e:
+        print(f'Error: Could not fetch the TCGplayer group list: {e}')
+        return None
+
+    found = {}
+    for group in groups:
+        if group['groupId'] in skip_group_ids or len(found) == len(wanted):
+            continue
+        endpoint = f"{CATEGORY_ID}/{group['groupId']}"
+        try:
+            hits = {p['productId']: p['name']
+                    for p in _fetch_results(f'{endpoint}/products', timeout)
+                    if p['productId'] in wanted}
+            if not hits:
+                continue
+            prices = _fetch_results(f'{endpoint}/prices', timeout)
+        except (requests.RequestException, KeyError, ValueError) as e:
+            print(f"Warning: skipped TCGplayer group {group['name']}: {e}")
+            continue
+        for product_id, name in hits.items():
+            found[product_id] = {'name': name, 'printings': {}}
+        for row in prices:
+            if row['productId'] in hits:
+                found[row['productId']]['printings'][row['subTypeName']] = {
+                    'market': row.get('marketPrice'),
+                    'low': row.get('lowPrice'),
+                }
+    return found
+
+
 def get_showcase_list(set_name, timeout=30):
     """Get the showcase (collector leader) variants of a set with prices.
 
