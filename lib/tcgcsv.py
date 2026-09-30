@@ -14,7 +14,7 @@ CATEGORY_ID = 79  # Star Wars: Unlimited
 BASE_URL = 'https://tcgcsv.com/tcgplayer'
 
 # TCGplayer (groupId, display name) for each supported set abbreviation.
-# HMW and IC27 are not on TCGplayer yet; add them here once they get groups
+# Add new sets once TCGplayer creates their groups
 # (list groups with: curl https://tcgcsv.com/tcgplayer/79/groups).
 GROUPS = {
     'sor': (23405, 'Spark of Rebellion'),
@@ -26,6 +26,8 @@ GROUPS = {
     'sec': (24387, 'Secrets of Power'),
     'law': (24572, 'A Lawless Time'),
     'ash': (24660, 'Ashes of the Empire'),
+    'hmw': (24812, 'Homeworlds'),
+    'ic27': (24888, 'Icons 2027 Edition'),
     'ts26': (24622, 'Twin Suns'),
     # TCGplayer has two groups abbreviated P26; this one holds the TS26
     # leader showcases (prize wall, 133-140). The other, 'Sector and Regional
