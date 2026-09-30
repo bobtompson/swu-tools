@@ -112,16 +112,16 @@ if __name__ == '__main__':
     # update_list_names("sec")
 
     # Already Run
-    # update_list_names('lof')
     # update_list_names('sor')
     # update_list_names('shd')
     # update_list_names('twi')
     # update_list_names('jtl')
+    # update_list_names('lof')
     # update_list_names('law')  # A Lawless Time - releases 2026-03-06
     # update_list_names('ts26')  # Twin Suns pre-cons - column D gets deck codes
+    # update_list_names('ash')  # Ashes of the Empire - releases 2026-07-17
 
     # Not yet released
-    # update_list_names('ash')  # Ashes of the Empire - releases 2026-07-17
     
     update_list_names('hmw')  # Homeworlds - releases 2026-10-03
 
