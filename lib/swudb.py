@@ -49,11 +49,11 @@ MAIN_SET_CARD_THRESHOLD = 80
 # Currently Premier-legal sets (main sets and sub sets). Update on rotation:
 # JTL rotates out when Legacy of Skywalker (set 10, first 2027 set) releases —
 # the plan appears to be rotating the oldest Premier-legal set annually.
-PREMIER_LEGAL_SETS = {"JTL", "LOF", "IBH", "SEC", "LAW", "ASH"}
+PREMIER_LEGAL_SETS = {"JTL", "LOF", "IBH", "SEC", "LAW", "ASH", "HMW"}
 
 # Upcoming sets that auto-flip Premier-legal at (release_date - PRERELEASE_DAYS).
 # After release, optionally move to PREMIER_LEGAL_SETS for clarity.
-PREMIER_PENDING_SETS = {"HMW", "IC27"}
+PREMIER_PENDING_SETS = {"IC27"}
 
 # Sets explicitly rotated out of Premier (legal in Eternal / Twin Suns only).
 PREMIER_ROTATED_SETS = {"SOR", "SHD", "TWI"}
@@ -71,7 +71,7 @@ PRERELEASE_DAYS = 7
 # TS26 released 5/8/26 (catalog says 7/11/26) — display-only, Premier-excluded.
 RELEASE_DATE_OVERRIDES = {
     "ASH": "7/17/26",
-    "HMW": "10/9/26",
+    "HMW": "10/2/26",
     "IC27": "11/20/26",
     "TS26": "5/8/26",
 }

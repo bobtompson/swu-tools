@@ -246,6 +246,48 @@ def get_cards_by_number(set_name, numbers, timeout=30):
     return cards
 
 
+def get_sealed_products(set_name, timeout=30):
+    """Get a set's sealed booster display and Spotlight Deck prices.
+
+    Sealed products sit in the set's group alongside the cards but carry
+    no card number, so they're matched by name: '... - Booster Display'
+    (LOF's Carbonite one is named '... Booster Box'), '... - Spotlight
+    Deck: <Leader>' and '... - Spotlight Deck Pair: <A> & <B>'. The
+    6-deck Spotlight Deck Display case and cards like 'Display Piece'
+    are skipped. Returns a dict with whichever exist:
+        'booster', 'carbonite', 'spotlight_pair': entry
+        'spotlight_decks': [entry, ...] in TCGplayer productId order,
+                           each with an extra 'leader' key
+    where entry is {'name', 'product_id', 'market', 'low'}. None on failure.
+    """
+    data = _fetch_group_data(set_name, timeout)
+    if data is None:
+        return None
+    products, by_product = data
+
+    sealed = {'spotlight_decks': []}
+    for product in sorted(products, key=lambda p: p['productId']):
+        name = product['name']
+        if _card_number(product) is not None:
+            continue
+        price = by_product.get(product['productId'], {}).get('Normal') or {}
+        entry = {
+            'name': name,
+            'product_id': product['productId'],
+            'market': price.get('marketPrice'),
+            'low': price.get('lowPrice'),
+        }
+        if ' - Spotlight Deck: ' in name:
+            entry['leader'] = name.split(' - Spotlight Deck: ', 1)[1]
+            sealed['spotlight_decks'].append(entry)
+        elif ' - Spotlight Deck Pair: ' in name:
+            sealed['spotlight_pair'] = entry
+        elif name.endswith(('Booster Display', 'Booster Box')):
+            kind = 'carbonite' if 'Carbonite' in name else 'booster'
+            sealed[kind] = entry
+    return sealed
+
+
 def get_prices_by_product_id(product_ids, skip_group_ids=(), timeout=30):
     """Look up TCGplayer products by productId across every SWU group.
 

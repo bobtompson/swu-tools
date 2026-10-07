@@ -77,13 +77,13 @@ def update_list_names(card_list):
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    update_list_names('lof')
+    # update_list_names('lof')
     # Already Run
     # update_list_names('sor')
     # update_list_names('shd')
     # update_list_names('twi')
     # update_list_names('jtl')
-
+    # update_list_names('hmw')
 
 
 
