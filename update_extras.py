@@ -83,8 +83,4 @@ if __name__ == '__main__':
     # update_list_names('shd')
     # update_list_names('twi')
     # update_list_names('jtl')
-    # update_list_names('hmw')
-
-
-
-
+    update_list_names('hmw')

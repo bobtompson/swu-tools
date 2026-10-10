@@ -14,11 +14,15 @@ Usage:
     uv run python generate_buy_list.py law ash          # specific sets
     uv run python generate_buy_list.py --all            # include leaders/bases
     uv run python generate_buy_list.py --max-price 2.00 # only cards at/under $2.00 market
+    uv run python generate_buy_list.py --max-count 1    # target 1 copy instead of a playset
     uv run python generate_buy_list.py -o wants.txt     # write to a file instead
+    uv run python generate_buy_list.py --cart           # open a TCGplayer Mass Entry cart
 """
 
 import datetime as dt
 import sys
+import webbrowser
+from urllib.parse import quote_plus
 
 import lib.swudb as swudb
 import lib.tcgcsv as tcgcsv
@@ -29,6 +33,11 @@ PLAYSET = 3
 # Row/column layout of each set tab (see main.py / CLAUDE.md)
 HEADER_ROWS = 2  # data starts at row 3
 COL_NUMBER, COL_NAME, COL_COUNT, COL_RARITY = 0, 1, 2, 3
+
+# TCGplayer Mass Entry pre-fills its item box from the URL (the same link
+# SWUDB's "Market Price" button builds); the user still clicks Add to Cart.
+MASS_ENTRY_URL = 'https://www.tcgplayer.com/massentry?productline=Star+Wars+Unlimited&c='
+MAX_URL_LENGTH = 4000  # split long buy lists across several Mass Entry pages
 
 
 def parse_count(raw):
@@ -56,8 +65,8 @@ def leader_base_numbers(set_name):
     return set(set_df.loc[mask, 'Number'].astype(str).str.zfill(3))
 
 
-def missing_cards_for_sheet(sheet, skip_numbers=frozenset()):
-    """Scan one set tab and return rows for cards short of a playset.
+def missing_cards_for_sheet(sheet, skip_numbers=frozenset(), target=PLAYSET):
+    """Scan one set tab and return rows for cards short of target copies.
 
     Rows with a blank Count cell are ignored (blank = not tracked; an
     explicit 0 marks a wanted card that's owned zero times). Rows whose
@@ -78,7 +87,7 @@ def missing_cards_for_sheet(sheet, skip_numbers=frozenset()):
         if count is None:
             blanks += 1
             continue
-        need = PLAYSET - count
+        need = target - count
         if need > 0:
             if row[COL_NUMBER].zfill(3) in skip_numbers:
                 skipped += 1
@@ -145,8 +154,58 @@ def filter_by_price(missing, price_map, max_price):
     return kept, over_limit
 
 
+def cart_items(set_name, missing, price_map):
+    """Mass Entry lines ('3 Filthy Dianoga [HMW]') for one set's missing cards.
+
+    Uses TCGplayer's own product name from the price map so the line matches
+    its catalog; our set abbreviations equal TCGplayer's set codes. Returns
+    (items, unlisted): unlisted cards have no TCGplayer product to add.
+    """
+    items, unlisted = [], []
+    for card in missing:
+        number = card['number'].zfill(3)
+        entry = (price_map or {}).get(number)
+        if entry is None:
+            unlisted.append(f"{set_name.upper()} {number} - {card['name']}")
+        else:
+            items.append(f"{card['need']} {entry['name']} [{set_name.upper()}]")
+    return items, unlisted
+
+
+def mass_entry_urls(items):
+    """Encode Mass Entry lines into one or more URLs under MAX_URL_LENGTH."""
+    urls, chunk = [], []
+    for item in items:
+        candidate = chunk + [item]
+        if chunk and len(MASS_ENTRY_URL + quote_plus('||'.join(candidate))) > MAX_URL_LENGTH:
+            urls.append(MASS_ENTRY_URL + quote_plus('||'.join(chunk)))
+            candidate = [item]
+        chunk = candidate
+    if chunk:
+        urls.append(MASS_ENTRY_URL + quote_plus('||'.join(chunk)))
+    return urls
+
+
+def open_cart(items, unlisted):
+    """Print and open the Mass Entry page(s) for the buy list."""
+    print()
+    if unlisted:
+        print(f'Not on TCGplayer (left out of the cart): {len(unlisted)} cards')
+        for line in unlisted:
+            print(f'    {line}')
+    if not items:
+        print('No cards to add to a TCGplayer cart.')
+        return
+    urls = mass_entry_urls(items)
+    print(f'TCGplayer Mass Entry: {len(items)} cards on {len(urls)} page(s) '
+          f'— click Add to Cart on each')
+    for url in urls:
+        print(f'  {url}')
+        webbrowser.open(url)
+
+
 def generate_buy_list(set_names, output_path=None, include_leaders_bases=False,
-                      max_price=None):
+                      max_price=None, cart=False, target=PLAYSET):
     spreadsheet = get_spreadsheet()
 
     if not set_names:
@@ -160,7 +219,7 @@ def generate_buy_list(set_names, output_path=None, include_leaders_bases=False,
     today = dt.date.today().isoformat()
     lines = [
         f'SWU Buy List — generated {today}',
-        f'Playset target: {PLAYSET} copies per card. '
+        f'Target: {target} copies per card. '
         f'Prices: TCGplayer via tcgcsv.com (Normal printing).',
     ]
     if not include_leaders_bases:
@@ -171,6 +230,7 @@ def generate_buy_list(set_names, output_path=None, include_leaders_bases=False,
     lines.append('')
     grand_market = grand_low = 0.0
     grand_cards = grand_copies = 0
+    all_items, all_unlisted = [], []
 
     for set_name in set_names:
         set_name = set_name.lower()
@@ -181,7 +241,7 @@ def generate_buy_list(set_names, output_path=None, include_leaders_bases=False,
             continue
 
         skip = set() if include_leaders_bases else leader_base_numbers(set_name)
-        missing, blanks, skipped = missing_cards_for_sheet(sheet, skip)
+        missing, blanks, skipped = missing_cards_for_sheet(sheet, skip, target)
         price_map = tcgcsv.get_price_map(set_name) if missing else None
         over_limit = 0
         if max_price is not None:
@@ -194,13 +254,17 @@ def generate_buy_list(set_names, output_path=None, include_leaders_bases=False,
         if over_limit:
             notes.append(f'{over_limit} over the price limit')
         note = f" ({'; '.join(notes)})" if notes else ''
-        print(f'{set_name.upper()}: {len(missing)} cards short of a playset{note}')
+        print(f'{set_name.upper()}: {len(missing)} cards short of {target} copies{note}')
         if not missing:
             continue
 
         section, market_total, low_total = build_set_section(
             set_name, missing, price_map, blanks, over_limit)
         lines.extend(section)
+        if cart:
+            items, unlisted = cart_items(set_name, missing, price_map)
+            all_items.extend(items)
+            all_unlisted.extend(unlisted)
         grand_market += market_total
         grand_low += low_total
         grand_cards += len(missing)
@@ -218,6 +282,9 @@ def generate_buy_list(set_names, output_path=None, include_leaders_bases=False,
         print()
         print('\n'.join(lines))
 
+    if cart:
+        open_cart(all_items, all_unlisted)
+
 
 if __name__ == '__main__':
     args = sys.argv[1:]
@@ -226,6 +293,9 @@ if __name__ == '__main__':
     include_all = '--all' in args
     if include_all:
         args.remove('--all')
+    cart = '--cart' in args
+    if cart:
+        args.remove('--cart')
     if '-o' in args:
         idx = args.index('-o')
         try:
@@ -242,6 +312,17 @@ if __name__ == '__main__':
             print('Error: --max-price requires a dollar amount (e.g. --max-price 2.00)')
             sys.exit(1)
         del args[idx:idx + 2]
+    target = PLAYSET
+    if '--max-count' in args:
+        idx = args.index('--max-count')
+        try:
+            target = int(args[idx + 1])
+            if target < 1:
+                raise ValueError
+        except (IndexError, ValueError):
+            print('Error: --max-count requires a positive whole number (e.g. --max-count 1)')
+            sys.exit(1)
+        del args[idx:idx + 2]
 
     generate_buy_list(args, output, include_leaders_bases=include_all,
-                      max_price=max_price)
+                      max_price=max_price, cart=cart, target=target)

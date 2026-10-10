@@ -57,8 +57,12 @@ def update_prices(set_name):
     print(f"Wrote prices for {card_count - len(missing)}/{card_count} cards "
           f"to {set_name.upper()} (H3:I{last_row})")
     if missing:
-        print(f"  {len(missing)} cards had no TCGplayer price (left blank):")
+        # Load names before printing the section so the cache message
+        # doesn't land inside the list.
         df = swudb.get_swu_list(set_name)
+        print()
+        print("Cards with no data:")
+        print(f"  {len(missing)} cards had no TCGplayer price (left blank)")
         for card_num in missing:
             name = swudb.get_card_name(df, card_num) or 'Unknown'
             print(f"    {set_name.upper()} {card_num} - {name}")

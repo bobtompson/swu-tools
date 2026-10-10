@@ -34,7 +34,7 @@ Note: If you are not sure how to do this. ChatGPT generated a step by step how-t
 - `./lib/deck_source.py` Unified loader that returns a normalized deck from a SWUDB URL, `.json`, `.txt` picklist, or sorted `.md` file.
 - `./lib/tcgcsv.py` TCGplayer price data via tcgcsv.com (free daily mirror, no API key). Maps each set abbreviation to its TCGplayer group and returns market/low prices keyed by 3-digit card number.
 - `update_prices.py` Writes TCGplayer Market/Low prices into columns H/I of a set's inventory tab.
-- `generate_buy_list.py` Scans the inventory tabs for cards short of a full playset (3 copies) and writes a priced `buy_list.txt`.
+- `generate_buy_list.py` Scans the inventory tabs for cards short of a full playset (3 copies) and prints a priced buy list; `--cart` opens TCGplayer Mass Entry with the list pre-filled.
 - `showcase_prices.py` Prints TCGplayer prices for every set's showcase (collector leader) variants; `--update-sheet` also writes them to the Collector tab.
 - `prestige_prices.py` Prints TCGplayer prices for prestige variants (normal + foil tiers; serialized excluded). `--mark-sheet` bold-borders the column E cell of every prestige-printing card on the set tabs.
 
@@ -123,7 +123,7 @@ Inventory: 3 in binder (synced 2026-07-22 23:47)
 Variants owned: 2× Prestige Foil, 1× Serialized (127/250)
 ```
 
-`update_prices.py` also stamps each set tab with a "Prices Updated:" timestamp in J1/K1, which the sync copies into the snapshot.
+Cards TCGplayer has no price for are left blank and listed under a "Cards with no data:" heading at the end of the run. `update_prices.py` also stamps each set tab with a "Prices Updated:" timestamp in J1/K1, which the sync copies into the snapshot.
 
 ## Deck Format Validator
 
@@ -210,10 +210,15 @@ uv run python update_prices.py law sec    # several sets in one run
 uv run python generate_buy_list.py               # every set tab in the sheet
 uv run python generate_buy_list.py law ash       # specific sets
 uv run python generate_buy_list.py --all         # include leaders and bases
-uv run python generate_buy_list.py -o wants.txt  # custom output file
+uv run python generate_buy_list.py --max-price 2.00  # only cards at/under $2.00 market
+uv run python generate_buy_list.py --max-count 1     # target 1 copy per card instead of a playset of 3
+uv run python generate_buy_list.py -o wants.txt  # write to a file instead of the console
+uv run python generate_buy_list.py --cart        # also open TCGplayer Mass Entry pre-filled
 ```
 
-The buy list (`buy_list.txt` by default) shows how many copies are needed per card with market/low prices, per-set subtotals, and a grand total. Leaders and bases are excluded by default (card types come from the cached swu-db set data); pass `--all` to include them. A blank Count cell means the card isn't tracked and is ignored — enter an explicit `0` for a wanted card you own none of. Cards without a TCGplayer price yet (common during presale) show `n/a` and are excluded from totals — this can make a presale set's low total exceed its market total, since more cards have listing prices than sale-history prices.
+The buy list (printed to the console, or to a file with `-o`) shows how many copies are needed per card with market/low prices, per-set subtotals, and a grand total. Leaders and bases are excluded by default (card types come from the cached swu-db set data); pass `--all` to include them. A blank Count cell means the card isn't tracked and is ignored — enter an explicit `0` for a wanted card you own none of. Cards without a TCGplayer price yet (common during presale) show `n/a` and are excluded from totals — this can make a presale set's low total exceed its market total, since more cards have listing prices than sale-history prices.
+
+`--cart` builds the same TCGplayer Mass Entry link SWUDB's "Market Price" button uses (lines like `3 Filthy Dianoga [HMW]`, using TCGplayer's own product names) and opens it in your browser — review the printing/condition options and click **Add to Cart**. Long lists are split across several Mass Entry pages (click Add to Cart on each; they share one cart). Cards TCGplayer doesn't list yet are printed and left out.
 
 New sets need their TCGplayer group id added to `GROUPS` in `lib/tcgcsv.py` (list groups with `curl https://tcgcsv.com/tcgplayer/79/groups`).
 
