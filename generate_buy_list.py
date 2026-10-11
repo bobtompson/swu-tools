@@ -17,6 +17,11 @@ Usage:
     uv run python generate_buy_list.py --max-count 1    # target 1 copy instead of a playset
     uv run python generate_buy_list.py -o wants.txt     # write to a file instead
     uv run python generate_buy_list.py --cart           # open a TCGplayer Mass Entry cart
+    uv run python generate_buy_list.py --prestige       # 1 prestige per card with a blank column E
+
+--prestige builds a different list: one copy of every prestige card whose
+column E (variant ownership) cell is blank, priced at the cheapest of its
+Prestige (P1), Prestige Foil (P2) and Serialized (P3) printings.
 """
 
 import datetime as dt
@@ -27,12 +32,20 @@ from urllib.parse import quote_plus
 import lib.swudb as swudb
 import lib.tcgcsv as tcgcsv
 from main import get_spreadsheet
+from prestige_prices import collect_prestige
 
 PLAYSET = 3
 
 # Row/column layout of each set tab (see main.py / CLAUDE.md)
 HEADER_ROWS = 2  # data starts at row 3
-COL_NUMBER, COL_NAME, COL_COUNT, COL_RARITY = 0, 1, 2, 3
+COL_NUMBER, COL_NAME, COL_COUNT, COL_RARITY, COL_VARIANTS = 0, 1, 2, 3, 4
+
+# Prestige tiers as (collect_prestige key, column E code, TCGplayer name tag)
+PRESTIGE_TIERS = (
+    ('prestige', 'P1', '(Prestige)'),
+    ('foil', 'P2', '(Prestige Foil)'),
+    ('serialized', 'P3', '(Serialized)'),
+)
 
 # TCGplayer Mass Entry pre-fills its item box from the URL (the same link
 # SWUDB's "Market Price" button builds); the user still clicks Add to Cart.
@@ -204,6 +217,138 @@ def open_cart(items, unlisted):
         webbrowser.open(url)
 
 
+def comparable_price(entry):
+    """Market price, falling back to low (serialized often has no market)."""
+    if entry is None:
+        return None
+    return entry['market'] if entry['market'] is not None else entry['low']
+
+
+def cheapest_prestige_tier(card):
+    """Pick the cheapest priced tier of a prestige card.
+
+    Returns (code, tag, entry), or (None, None, None) when no tier has a
+    price on TCGplayer.
+    """
+    priced = [(comparable_price(card[key]), code, tag, card[key])
+              for key, code, tag in PRESTIGE_TIERS
+              if comparable_price(card.get(key)) is not None]
+    if not priced:
+        return None, None, None
+    _, code, tag, entry = min(priced, key=lambda p: p[0])
+    return code, tag, entry
+
+
+def missing_prestige_for_sheet(sheet, cards):
+    """Prestige cards whose column E cell is blank on a set tab.
+
+    cards come from prestige_prices.collect_prestige for that set. Any text
+    in column E counts as owning something. Returns a list of dicts
+    {number, name, rarity, code, tag, entry}; code/tag/entry are None when no tier
+    is priced.
+    """
+    values = sheet.get_all_values()
+    missing = []
+    for card in cards:
+        if not card['original']:
+            continue
+        row_idx = HEADER_ROWS + int(card['original']) - 1
+        row = values[row_idx] if row_idx < len(values) else []
+        if len(row) > COL_VARIANTS and row[COL_VARIANTS].strip():
+            continue
+        code, tag, entry = cheapest_prestige_tier(card)
+        rarity = row[COL_RARITY] if len(row) > COL_RARITY else ''
+        missing.append({'number': card['original'], 'name': card['name'],
+                        'rarity': rarity, 'code': code, 'tag': tag, 'entry': entry})
+    return missing
+
+
+def emit_lines(lines, output_path):
+    """Print the buy list, or write it to output_path."""
+    if output_path:
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(lines) + '\n')
+        print(f'\nBuy list written to {output_path}')
+        print(lines[-1])
+    else:
+        print()
+        print('\n'.join(lines))
+
+
+def generate_prestige_buy_list(set_names, output_path=None, max_price=None,
+                               cart=False):
+    """Buy list of 1 prestige per card with a blank column E, cheapest tier."""
+    spreadsheet = get_spreadsheet()
+    tab_titles = {ws.title for ws in spreadsheet.worksheets()}
+    if not set_names:
+        set_names = [s for s in swudb.VALID_SETS
+                     if s.upper() in tab_titles and s in tcgcsv.GROUPS]
+
+    today = dt.date.today().isoformat()
+    lines = [
+        f'SWU Prestige Buy List — generated {today}',
+        '1 copy of each prestige card with a blank column E, at the cheapest of '
+        'P1 (Prestige) / P2 (Prestige Foil) / P3 (Serialized).',
+        'Prices: TCGplayer via tcgcsv.com (market, or low when no market).',
+    ]
+    if max_price is not None:
+        lines.append(f'Price limit: cards over {format_money(max_price)} excluded.')
+    lines.append('')
+
+    prestige_by_set = collect_prestige(
+        [s.lower() for s in set_names if s.upper() in tab_titles],
+        include_serialized=True)
+    grand_total = 0.0
+    grand_cards = 0
+    all_items, all_unlisted = [], []
+
+    for set_name, cards in prestige_by_set.items():
+        sheet = spreadsheet.worksheet(set_name.upper())
+        missing = missing_prestige_for_sheet(sheet, cards)
+        over_limit = 0
+        if max_price is not None:
+            kept = [c for c in missing
+                    if c['entry'] is None or comparable_price(c['entry']) <= max_price]
+            over_limit = len(missing) - len(kept)
+            missing = kept
+        note = f' ({over_limit} over the price limit)' if over_limit else ''
+        print(f'{set_name.upper()}: {len(missing)} of {len(cards)} prestige cards '
+              f'with a blank column E{note}')
+        if not missing:
+            continue
+
+        lines.append(f'=== {set_name.upper()} — {tcgcsv.get_set_display_name(set_name)} ===')
+        if over_limit:
+            lines.append(f'  note: {over_limit} cards over the price limit were excluded')
+        set_total = 0.0
+        for card in missing:
+            entry = card['entry']
+            price = comparable_price(entry)
+            if price is not None:
+                set_total += price
+            market = entry['market'] if entry else None
+            low = entry['low'] if entry else None
+            lines.append(
+                f"  1x {card['number']:>3} {card['name']:<40.40} "
+                f"{card['rarity'] or '?'} {card['code'] or '--'}  market {format_money(market):>9}  "
+                f"low {format_money(low):>9}"
+            )
+            if cart:
+                if entry is None:
+                    all_unlisted.append(f"{set_name.upper()} {card['number']} - {card['name']}")
+                else:
+                    all_items.append(f"1 {entry['name']} {card['tag']} [{set_name.upper()}]")
+        lines.append(f'  subtotal: {len(missing)} cards — {format_money(set_total)}')
+        lines.append('')
+        grand_total += set_total
+        grand_cards += len(missing)
+
+    lines.append(f'=== TOTAL: {grand_cards} prestige cards — {format_money(grand_total)} ===')
+    emit_lines(lines, output_path)
+    if cart:
+        open_cart(all_items, all_unlisted)
+
+
 def generate_buy_list(set_names, output_path=None, include_leaders_bases=False,
                       max_price=None, cart=False, target=PLAYSET):
     spreadsheet = get_spreadsheet()
@@ -273,15 +418,7 @@ def generate_buy_list(set_names, output_path=None, include_leaders_bases=False,
     lines.append(f'=== TOTAL: {grand_cards} cards / {grand_copies} copies — '
                  f'market {format_money(grand_market)}, low {format_money(grand_low)} ===')
 
-    if output_path:
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(lines) + '\n')
-        print(f'\nBuy list written to {output_path}')
-        print(lines[-1])
-    else:
-        print()
-        print('\n'.join(lines))
-
+    emit_lines(lines, output_path)
     if cart:
         open_cart(all_items, all_unlisted)
 
@@ -296,6 +433,9 @@ if __name__ == '__main__':
     cart = '--cart' in args
     if cart:
         args.remove('--cart')
+    prestige = '--prestige' in args
+    if prestige:
+        args.remove('--prestige')
     if '-o' in args:
         idx = args.index('-o')
         try:
@@ -324,5 +464,8 @@ if __name__ == '__main__':
             sys.exit(1)
         del args[idx:idx + 2]
 
+    if prestige:
+        generate_prestige_buy_list(args, output, max_price=max_price, cart=cart)
+        sys.exit(0)
     generate_buy_list(args, output, include_leaders_bases=include_all,
                       max_price=max_price, cart=cart, target=target)

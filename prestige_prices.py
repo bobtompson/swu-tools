@@ -29,13 +29,14 @@ PRESTIGE_BORDER = {
 }
 
 
-def collect_prestige(set_names):
+def collect_prestige(set_names, include_serialized=False):
     """Fetch prestige normal+foil prices per set, merged per card.
 
     Returns {set_name: [{'original': '039', 'name': ...,
                          'prestige': entry|None, 'foil': entry|None}]}
-    sorted by original card number. Sets without prestige products
-    (pre-JTL) are skipped with a note.
+    sorted by original card number. With include_serialized each card also
+    gets a 'serialized' entry (used by generate_buy_list.py --prestige).
+    Sets without prestige products (pre-JTL) are skipped with a note.
     """
     results = {}
     for set_name in set_names:
@@ -45,14 +46,16 @@ def collect_prestige(set_names):
             continue
         prestige = tcgcsv.get_variant_list(set_name, '(Prestige)')
         foil = tcgcsv.get_variant_list(set_name, '(Prestige Foil)')
-        if prestige is None or foil is None:
+        serialized = (tcgcsv.get_variant_list(set_name, '(Serialized)')
+                      if include_serialized else [])
+        if prestige is None or foil is None or serialized is None:
             continue
         if not prestige and not foil:
             print(f'Skipping {set_name.upper()}: no prestige cards found')
             continue
 
         set_df = swudb.get_swu_list(set_name)
-        variants = prestige + foil
+        variants = prestige + foil + serialized
         for entry in variants:
             entry['original'] = original_card_number(set_df, entry['number'])
         if any(not entry['original'] for entry in variants):
@@ -61,13 +64,16 @@ def collect_prestige(set_names):
             for entry in variants:
                 entry['original'] = original_card_number(set_df, entry['number'])
 
+        tiers = [('prestige', prestige), ('foil', foil)]
+        if include_serialized:
+            tiers.append(('serialized', serialized))
         merged = {}
-        for tier, entries in (('prestige', prestige), ('foil', foil)):
+        for tier, entries in tiers:
             for entry in entries:
                 key = entry['original'] or entry['number']
                 card = merged.setdefault(
                     key, {'original': entry['original'], 'name': entry['name'],
-                          'prestige': None, 'foil': None})
+                          **{t: None for t, _ in tiers}})
                 card[tier] = entry
         results[set_name] = sorted(merged.values(),
                                    key=lambda c: c['original'] or '999')
