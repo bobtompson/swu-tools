@@ -16,7 +16,7 @@ import requests
 MAIN_SETS = ['sor', 'shd', 'twi', 'jtl', 'lof', 'sec', 'law', 'ash', 'hmw']
 
 # Sub sets — supplemental products between main sets, in release order.
-# IBH (Intro Battle: Hoth, 10/3/25) and IC27 (Icons 2027 Edition, 11/20/26)
+# IBH (Intro Battle: Hoth, 10/3/25) and IC27 (Icons 2027 Edition, 11/21/26)
 # are Premier-legal; TS26 (Twin Suns 2026 pre-con cards, 5/8/26) is
 # Twin Suns / Eternal only. Premier legality lives in the PREMIER_* sets below.
 SUB_SETS = ['ibh', 'ts26', 'ic27']
@@ -51,7 +51,8 @@ MAIN_SET_CARD_THRESHOLD = 80
 # the plan appears to be rotating the oldest Premier-legal set annually.
 PREMIER_LEGAL_SETS = {"JTL", "LOF", "IBH", "SEC", "LAW", "ASH", "HMW"}
 
-# Upcoming sets that auto-flip Premier-legal at (release_date - PRERELEASE_DAYS).
+# Upcoming sets that auto-flip Premier-legal at (release_date - PRERELEASE_DAYS),
+# or at their PREMIER_LEGAL_DATE_OVERRIDES date when one is set.
 # After release, optionally move to PREMIER_LEGAL_SETS for clarity.
 PREMIER_PENDING_SETS = {"IC27"}
 
@@ -67,13 +68,20 @@ PRERELEASE_DAYS = 7
 # Release-date overrides ("M/D/YY") for sets whose swu-db catalog date is wrong
 # or missing. ASH released 7/17/26 (catalog says 7/27/26) — display-only now
 # that ASH is in PREMIER_LEGAL_SETS. HMW (Homeworlds) releases 10/9/26 ->
-# Premier-legal 10/2/26. IC27 releases 11/20/26 -> Premier-legal 11/13/26.
+# Premier-legal 10/2/26. IC27 releases 11/21/26 (Premier date: see below).
 # TS26 released 5/8/26 (catalog says 7/11/26) — display-only, Premier-excluded.
 RELEASE_DATE_OVERRIDES = {
     "ASH": "7/17/26",
-    "HMW": "10/2/26",
-    "IC27": "11/20/26",
+    "HMW": "10/9/26",
+    "IC27": "11/21/26",
     "TS26": "5/8/26",
+}
+
+# Explicit Premier-legal dates ("M/D/YY") for pending sets that don't follow
+# the release - PRERELEASE_DAYS rule. IC27 releases 11/21/26 but is only
+# Premier-legal from 11/27/26 (no pre-release window for Icons).
+PREMIER_LEGAL_DATE_OVERRIDES = {
+    "IC27": "11/27/26",
 }
 
 # Card-name bans in Premier (independent of set legality).
@@ -148,6 +156,19 @@ def get_sets_catalog(force_refresh=False):
     return catalog
 
 
+def premier_legal_date(set_id, catalog_release=None):
+    """Date a pending set becomes Premier-legal, or None if unknown.
+
+    PREMIER_LEGAL_DATE_OVERRIDES wins; otherwise release date (override, then
+    catalog) minus PRERELEASE_DAYS.
+    """
+    explicit = parse_release_date(PREMIER_LEGAL_DATE_OVERRIDES.get(set_id))
+    if explicit:
+        return explicit
+    release = parse_release_date(RELEASE_DATE_OVERRIDES.get(set_id) or catalog_release)
+    return release - dt.timedelta(days=PRERELEASE_DAYS) if release else None
+
+
 def set_legality(set_id, catalog, today=None):
     """Return {'premier': bool, 'eternal': bool, 'twin_suns': bool} for set_id.
 
@@ -155,7 +176,7 @@ def set_legality(set_id, catalog, today=None):
         - Eternal and Twin Suns: every set is legal (no current rotation or bans).
         - Premier: legal if the set's effective parent (parentSetId or self) is
           in PREMIER_LEGAL_SETS, OR is in PREMIER_PENDING_SETS and today
-          is within PRERELEASE_DAYS of that parent's release date.
+          has reached that parent's premier_legal_date().
         - Unknown sets (not in catalog): assumed Premier-illegal, Eternal/TS legal.
     """
     today = today or dt.date.today()
@@ -163,11 +184,10 @@ def set_legality(set_id, catalog, today=None):
     if info is None:
         # swu-db's catalog lags on new sets; a pending set with an override
         # date can still flip Premier-legal on schedule.
-        if set_id in PREMIER_PENDING_SETS and set_id in RELEASE_DATE_OVERRIDES:
-            release = parse_release_date(RELEASE_DATE_OVERRIDES[set_id])
-            if release:
-                premier = today >= release - dt.timedelta(days=PRERELEASE_DAYS)
-                return {'premier': premier, 'eternal': True, 'twin_suns': True}
+        if set_id in PREMIER_PENDING_SETS:
+            legal_from = premier_legal_date(set_id)
+            if legal_from:
+                return {'premier': today >= legal_from, 'eternal': True, 'twin_suns': True}
         return {'premier': False, 'eternal': True, 'twin_suns': True}
 
     effective_parent = info.get('parentSetId') or set_id
@@ -178,9 +198,8 @@ def set_legality(set_id, catalog, today=None):
         premier = True
     elif effective_parent in PREMIER_PENDING_SETS:
         parent_info = next((s for s in catalog if s.get('setId') == effective_parent), info)
-        release = parse_release_date(
-            RELEASE_DATE_OVERRIDES.get(effective_parent) or parent_info.get('releaseDate'))
-        premier = bool(release and today >= release - dt.timedelta(days=PRERELEASE_DAYS))
+        legal_from = premier_legal_date(effective_parent, parent_info.get('releaseDate'))
+        premier = bool(legal_from and today >= legal_from)
     else:
         premier = False
 

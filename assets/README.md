@@ -51,7 +51,7 @@ kit ships the real logos, at which point these should be replaced.
 
 | File | Product |
 |------|---------|
-| `Icons_2027_Edition.png` | Icons 2027 Edition (IC27, releases 11/20/26) |
+| `Icons_2027_Edition.png` | Icons 2027 Edition (IC27, releases 11/21/26, Premier-legal 11/27/26) |
 | `Homeworlds.png` | Homeworlds (HMW, main set after ASH, releases 10/9/26) |
 | `Twin_Suns_Format.png` | Twin Suns format logo (not a set) |
 

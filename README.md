@@ -254,8 +254,9 @@ The constants you'll edit over time, all near the top of `lib/swudb.py`. `MAIN_S
 ```python
 MAIN_SETS               = ['sor', 'shd', 'twi', 'jtl', 'lof', 'sec', 'law', 'ash', 'hmw']
 SUB_SETS                = ['ibh', 'ts26', 'ic27']  # supplemental products, release order
-PREMIER_LEGAL_SETS      = {"JTL", "LOF", "IBH", "SEC", "LAW", "ASH"}
-PREMIER_PENDING_SETS    = {"HMW", "IC27"}  # auto-flip Premier-legal at release - 7 days
+PREMIER_LEGAL_SETS      = {"JTL", "LOF", "IBH", "SEC", "LAW", "ASH", "HMW"}
+PREMIER_PENDING_SETS    = {"IC27"}       # auto-flip Premier-legal at release - 7 days
+PREMIER_LEGAL_DATE_OVERRIDES = {"IC27": "11/27/26"}  # explicit flip date when it isn't release - 7
 PREMIER_ROTATED_SETS    = {"SOR", "SHD", "TWI"}
 PREMIER_EXCLUDED_SETS   = {"TS26"}       # main-class but never Premier-legal
 PREMIER_SUSPENDED_CARDS = {...}          # card-name bans, independent of set legality
@@ -271,6 +272,7 @@ Everything else — Eternal and Twin Suns legality (currently no rotation or ban
 1. Add the lowercase set ID to `MAIN_SETS` (numbered main set) or `SUB_SETS` (supplemental product) in release-date order.
 2. Add the uppercase ID to `PREMIER_PENDING_SETS`.
 3. If the catalog date is missing or wrong, add the announced date to `RELEASE_DATE_OVERRIDES` so the pre-release auto-flip works.
+4. If the set's Premier-legal date isn't release − 7 days (e.g., `IC27` releases 11/21/26 but is Premier-legal 11/27/26), add it to `PREMIER_LEGAL_DATE_OVERRIDES`.
 
 **A pending set passes its pre-release threshold (e.g., `ASH` on 2026-07-10).** No action required — `set_legality()` auto-flips it Premier-legal. As a one-line cleanup, move the ID from `PREMIER_PENDING_SETS` to `PREMIER_LEGAL_SETS` so the data matches reality (done for `ASH` on 2026-07-26).
 

@@ -19,7 +19,6 @@ from lib.swudb import (
     PREMIER_LEGAL_SETS,
     PREMIER_PENDING_SETS,
     PREMIER_ROTATED_SETS,
-    PRERELEASE_DAYS,
     VALID_SETS,
     VALID_SETS_UPPER,
     fetch_remote_sets,
@@ -28,6 +27,7 @@ from lib.swudb import (
     get_swu_list,
     is_main_set,
     parse_release_date,
+    premier_legal_date,
     set_legality,
 )
 
@@ -77,8 +77,8 @@ def _legality_cell(legal, set_id, catalog, today):
         return '✓'
     if set_id in PREMIER_PENDING_SETS:
         info = next((s for s in catalog if s.get('setId') == set_id), None)
-        release = parse_release_date((info or {}).get('releaseDate'))
-        if release and today < release - dt.timedelta(days=PRERELEASE_DAYS):
+        flip = premier_legal_date(set_id, (info or {}).get('releaseDate'))
+        if flip and today < flip:
             return '*'
     return '-'
 
@@ -89,9 +89,8 @@ def _annotate_full_name(set_id, full_name, catalog, today):
         return f"{full_name} (rotated)"
     if set_id in PREMIER_PENDING_SETS:
         info = next((s for s in catalog if s.get('setId') == set_id), None)
-        release = parse_release_date((info or {}).get('releaseDate'))
-        if release and today < release - dt.timedelta(days=PRERELEASE_DAYS):
-            flip = release - dt.timedelta(days=PRERELEASE_DAYS)
+        flip = premier_legal_date(set_id, (info or {}).get('releaseDate'))
+        if flip and today < flip:
             return f"{full_name} (Premier-legal {flip.isoformat()})"
     return full_name
 
