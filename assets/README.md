@@ -19,7 +19,9 @@ Materials Policy. Not open-licensed — use accordingly (non-commercial fan tool
 | `Secrets_of_Power.png` | Secrets of Power | SEC |
 | `A_Lawless_Time.png` | A Lawless Time | LAW |
 | `Ashes_of_the_Empire.png` | Ashes of the Empire | ASH |
+| `Homeworlds.png` | Homeworlds | HMW |
 | `Intro_Battle_Hoth.png` | Intro Battle: Hoth | IBH |
+| `Icons_2027_Edition.png` | Icons 2027 Edition | IC27 |
 
 SOR's logo is the inline page image (`spark_of_rebellion_Logo_*.png`), not a download zip.
 
@@ -39,20 +41,20 @@ Each set has an official signature color shown on its media-kit page as a solid 
 | Secrets of Power | SEC | `#68177f` |
 | A Lawless Time | LAW | `#ff6900` |
 | Ashes of the Empire | ASH | `#425563` |
+| Homeworlds | HMW | `#007a3e` |
 
-Intro Battle: Hoth (IBH) has no set color.
+Intro Battle: Hoth (IBH) and Icons 2027 Edition (IC27) have no set color.
 
 ## `logo-cutouts/` — unofficial cutouts (placeholder quality)
 
 Logos cropped out of a cardgamer.com blog image
 (`swu-2027-timeline-1024x576.jpg`, May 2026) — **not** media-kit assets: low-res,
 navy starfield background baked in (not transparent). Placeholders until the media
-kit ships the real logos, at which point these should be replaced.
+kit ships the real logos, at which point they move to `set-logos/` (done for IC27 and
+HMW on 2026-10-15).
 
 | File | Product |
 |------|---------|
-| `Icons_2027_Edition.png` | Icons 2027 Edition (IC27, releases 11/21/26, Premier-legal 11/27/26) |
-| `Homeworlds.png` | Homeworlds (HMW, main set after ASH, releases 10/9/26) |
 | `Twin_Suns_Format.png` | Twin Suns format logo (not a set) |
 
 ## `logos/` — game + competitive-play logos
@@ -65,4 +67,9 @@ kit ships the real logos, at which point these should be replaced.
 
 Logos are downloaded from `https://cdn.starwarsunlimited.com//<Name>_Logo_<hash>.zip` (note the
 double slash — it is part of the S3 key). Requires a browser `User-Agent`. The asset list comes
-from `https://admin.starwarsunlimited.com/api/media-kit?populate=deep,10` (Strapi CMS).
+from `https://admin.starwarsunlimited.com/api/media-kit?populate=deep,10` (Strapi CMS). When
+that API 502s (it did through Sept–Oct 2026), load <https://starwarsunlimited.com/media-kit>
+in a browser, click the set in the sidebar, and read the `cdn.starwarsunlimited.com` URLs off
+the page. Media-kit logo PNGs are 1000×404 with transparent padding; `set-logos/` keeps them
+cropped to the alpha bounding box, and the website copies (`public/sets/`) are that crop
+scaled to 96px tall.
