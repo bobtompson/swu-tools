@@ -15,7 +15,9 @@ def get_spreadsheet():
 
     # Authenticate
     creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
-    client = gspread.authorize(creds)
+    # BackOffHTTPClient retries 429 rate-limit errors with exponential
+    # backoff, so long runs (update_all_prices.py) ride out the per-minute quota
+    client = gspread.authorize(creds, http_client=gspread.BackOffHTTPClient)
 
     # Open the spreadsheet
     return client.open("SWU Sets Playset")

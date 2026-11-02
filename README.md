@@ -34,6 +34,7 @@ Note: If you are not sure how to do this. ChatGPT generated a step by step how-t
 - `./lib/deck_source.py` Unified loader that returns a normalized deck from a SWUDB URL, `.json`, `.txt` picklist, or sorted `.md` file.
 - `./lib/tcgcsv.py` TCGplayer price data via tcgcsv.com (free daily mirror, no API key). Maps each set abbreviation to its TCGplayer group and returns market/low prices keyed by 3-digit card number.
 - `update_prices.py` Writes TCGplayer Market/Low prices into columns H/I of a set's inventory tab.
+- `update_all_prices.py` Refreshes every price on the spreadsheet in one run: all set tabs (H/I), the Collector tab, promo tabs (P26), and the Sealed tab. `--only` runs selected steps; `--refresh-promos` re-fetches promo sets from swu-db first.
 - `generate_buy_list.py` Scans the inventory tabs for cards short of a full playset (3 copies) and prints a priced buy list; `--cart` opens TCGplayer Mass Entry with the list pre-filled.
 - `showcase_prices.py` Prints TCGplayer prices for every set's showcase (collector leader) variants; `--update-sheet` also writes them to the Collector tab.
 - `prestige_prices.py` Prints TCGplayer prices for prestige variants (normal + foil tiers; serialized excluded). `--mark-sheet` bold-borders the column E cell of every prestige-printing card on the set tabs.
@@ -203,6 +204,13 @@ Prices come from [tcgcsv.com](https://tcgcsv.com), a free daily mirror of TCGpla
 ```bash
 uv run python update_prices.py ash        # one set
 uv run python update_prices.py law sec    # several sets in one run
+```
+
+**Refresh every price on the spreadsheet (set tabs, Collector, P26, Sealed):**
+```bash
+uv run python update_all_prices.py                    # everything
+uv run python update_all_prices.py --refresh-promos   # re-fetch promo sets from swu-db first
+uv run python update_all_prices.py --only sets sealed # selected steps: sets, collector, promos, sealed
 ```
 
 **Generate a buy list of cards short of a full playset (3 copies):**

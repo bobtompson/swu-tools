@@ -59,6 +59,12 @@ NUMBER_FIXES = {
                  # 73; swu-db has 74
 }
 
+# Retail-exclusive promos TCGplayer files inside a main set's group with
+# their own 1..n numbering (ASH's Costco Luke / Leia / Han are 1-3), which
+# would collide with the set's real cards. Products carrying one of these
+# name tags are treated as non-card products by _card_number.
+OFF_SET_TAGS = ('(Costco Exclusive)',)
+
 # tcgcsv.com returns 401 for the default python-requests user agent
 REQUEST_HEADERS = {'User-Agent': 'swu-tools/1.0 (SWU inventory scripts)'}
 
@@ -86,11 +92,13 @@ def _card_number(product):
 
     TCGplayer numbers cards as '015/264' (base set) or plain '295'
     (variants above the printed count). Returns an int, or None for
-    non-card products such as sealed boosters.
+    non-card products such as sealed boosters and OFF_SET_TAGS promos.
     """
     fix = NUMBER_FIXES.get(product['productId'])
     if fix is not None:
         return fix
+    if any(tag in product['name'] for tag in OFF_SET_TAGS):
+        return None
     for entry in product.get('extendedData', []):
         if entry['name'] == 'Number':
             try:
