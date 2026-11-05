@@ -1,20 +1,12 @@
 import lib.swudb as swudb
 
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 
 
 def get_doc_sheet(sheet_name):
 # Returns the specific sub sheet in the google spreadsheet
-    # Define scope
-    scope = [
-        "https://spreadsheets.google.com/feeds",
-        "https://www.googleapis.com/auth/drive",
-    ]
-
-    # Authenticate
-    creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
-    client = gspread.authorize(creds)
+    # Authenticate with the service account (default scopes: Sheets + Drive)
+    client = gspread.service_account(filename="credentials.json")
 
     # Open the spreadsheet and select a worksheet
     spreadsheet = client.open("SWU Sets Extra Inventory")
@@ -23,15 +15,8 @@ def get_doc_sheet(sheet_name):
 
 def test_sheets():
 # Testing for google sheet and api data
-    # Define scope
-    scope = [
-        "https://spreadsheets.google.com/feeds",
-        "https://www.googleapis.com/auth/drive",
-    ]
-
-    # Authenticate
-    creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
-    client = gspread.authorize(creds)
+    # Authenticate with the service account (default scopes: Sheets + Drive)
+    client = gspread.service_account(filename="credentials.json")
 
 
 

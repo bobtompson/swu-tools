@@ -1,6 +1,5 @@
 import lib.swudb as swudb
 from rich.console import Console
-from rich.table import Table
 import pandas as pd
 
 if __name__ == '__main__':

@@ -2,22 +2,16 @@ import lib.swudb as swudb
 from sort_deck_by_set import get_ts26_decks
 
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 
 
 def get_spreadsheet():
 # Returns the inventory google spreadsheet
-    # Define scope
-    scope = [
-        "https://spreadsheets.google.com/feeds",
-        "https://www.googleapis.com/auth/drive",
-    ]
-
-    # Authenticate
-    creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+    # Authenticate with the service account (default scopes: Sheets + Drive)
     # BackOffHTTPClient retries 429 rate-limit errors with exponential
     # backoff, so long runs (update_all_prices.py) ride out the per-minute quota
-    client = gspread.authorize(creds, http_client=gspread.BackOffHTTPClient)
+    client = gspread.service_account(
+        filename="credentials.json", http_client=gspread.BackOffHTTPClient
+    )
 
     # Open the spreadsheet
     return client.open("SWU Sets Playset")
@@ -30,15 +24,8 @@ def get_doc_sheet(sheet_name):
 
 def test_sheets():
 # Testing for google sheet and api data
-    # Define scope
-    scope = [
-        "https://spreadsheets.google.com/feeds",
-        "https://www.googleapis.com/auth/drive",
-    ]
-
-    # Authenticate
-    creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
-    client = gspread.authorize(creds)
+    # Authenticate with the service account (default scopes: Sheets + Drive)
+    client = gspread.service_account(filename="credentials.json")
 
 
 
