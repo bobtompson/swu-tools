@@ -182,9 +182,13 @@ The `deck_diff.py` script prints a GitHub-style diff between two decks — usefu
 **Usage:**
 ```bash
 uv run python deck_diff.py <old_deck> <new_deck>
+uv run python deck_diff.py <old_deck> <new_deck> --markdown            # print Markdown instead of colored text
+uv run python deck_diff.py <old_deck> <new_deck> -o swudb_lists/diff.md # write the Markdown to a file
 ```
 
-Each argument may be a SWUDB URL, `.json`, `.txt`, or sorted `.md` file. Cards are matched by `(set, number)`, so a reprint swap (same name, different set) reads as one removal + one addition. Sections covered: leaders, base, main deck, sideboard. Sideboard is folded into the main deck for the diff when either source is a non-URL file (because picklist/markdown formats don't carry sideboard separately).
+The Markdown version lists the old/new decks and the command that produced it, and wraps each section in a ```` ```diff ```` block, so GitHub, VS Code, and most Markdown viewers color removals red and additions green.
+
+Each argument may be a SWUDB URL, `.json`, `.txt`, or sorted `.md` file. Cards are matched by `(set, number)`, so a reprint swap (same name, different set) reads as one removal + one addition. Sections covered: leaders, base, main deck, sideboard. Sideboard is folded into the main deck for the diff when either source is a non-URL file (because picklist/markdown formats don't carry sideboard separately). Quantity changes print only the difference — a card going from 2 to 3 copies shows as `+ 1x … (2 → 3)`. When both decks are URLs (separate sideboards), a final **Net Cards** section combines main deck + sideboard into the physical pull/add list, so cards that only move between them drop out.
 
 ## Google Sheet Inventory
 How I set up my inventory. I set up my functions in `main.py` with this format in mind.
@@ -243,7 +247,7 @@ uv run python showcase_prices.py --update-sheet  # also update the Collector tab
 
 Each line shows the showcase's card number, the leader, the original (base) card number, market/low prices, and live market availability (`avail 4 in 3 listings` = 4 copies across 3 seller listings). Availability comes from TCGplayer's own marketplace API — one request per card, so pass `--no-listings` for a faster prices-only run; if TCGplayer starts blocking, the script degrades to prices-only automatically. The base number comes from matching the showcase's number into the swu-db set data (every printing of a leader is its own row there; the lowest number is the original) — if the local cache predates a set's variant data, the script refreshes it automatically.
 
-`--update-sheet` fills the Collector tab columns: Card Num., Card Name, Count (hand-entered, never touched), Original Card Number, Source (`LAW Showcase`), Current Price (market). Rows are matched by Card Num. + Source, so reruns refresh prices in place, new sets append, and any other rows on the tab are left alone.
+`--update-sheet` fills the Collector tab columns: Card Num., Card Name, Count (hand-entered, never touched), Original Card Number, Source (`LAW Showcase`), Current Price (market). Rows are matched by Card Num. + Source, so reruns refresh prices in place, new sets append, and any other rows on the tab are left alone. Each run also stamps E1/F1 with a "Prices Updated:" timestamp (the P26 tab written by `promo_prices.py --update-sheet` gets the same stamp).
 
 Note: SOR has only 16 priceable showcases — the ultra-rare Luke Skywalker "Faithful Friend" and Darth Vader "Dark Lord of the Sith" showcases are not cataloged as TCGplayer products.
 

@@ -22,6 +22,7 @@ Usage:
 """
 
 import sys
+from datetime import datetime
 
 import lib.swudb as swudb
 import lib.tcgcsv as tcgcsv
@@ -29,6 +30,8 @@ from main import get_doc_sheet
 
 COLLECTOR_TAB = 'Collector'
 HEADER_ROWS = 2  # row 1 title, row 2 column headers; data starts at row 3
+# Row 1 'Prices Updated:' label + timestamp, above the Source / Current Price columns
+STAMP_RANGE = 'E1:F1'
 # Collector tab columns: A Card Num., B Card Name, C Count,
 # D Original Card Number, E Source, F Current Price
 COL_NUM, COL_NAME, COL_COUNT, COL_ORIGINAL, COL_SOURCE, COL_PRICE = range(6)
@@ -199,7 +202,8 @@ def upsert_collector_rows(tab_name, entries, match_source=True):
     rows are matched by (Card Num., Source) — or Card Num. alone when
     match_source is False, for tabs holding a single set — and updated in
     place; the Count column and any rows this script doesn't manage are
-    untouched. New entries are appended after the last used row. Reads
+    untouched. New entries are appended after the last used row, and E1/F1
+    get a 'Prices Updated:' timestamp. Reads
     formulas (not rendered values) so writing the region back doesn't
     flatten them.
     """
@@ -237,8 +241,11 @@ def upsert_collector_rows(tab_name, entries, match_source=True):
             appended += 1
 
     last_row = HEADER_ROWS + len(rows)
-    sheet.update(rows, f'A{HEADER_ROWS + 1}:F{last_row}',
-                 value_input_option='USER_ENTERED')
+    sheet.batch_update([
+        {'range': f'A{HEADER_ROWS + 1}:F{last_row}', 'values': rows},
+        {'range': STAMP_RANGE, 'values': [
+            ['Prices Updated:', datetime.now().strftime('%Y-%m-%d %H:%M')]]},
+    ], value_input_option='USER_ENTERED')
     sheet.format(f'F{HEADER_ROWS + 1}:F{last_row}',
                  {'numberFormat': {'type': 'CURRENCY', 'pattern': '$0.00'}})
     print(f'\n{tab_name} tab updated: {appended} rows added, '
