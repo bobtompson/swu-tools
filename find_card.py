@@ -205,6 +205,9 @@ def main():
     header = f'{set_abbr} {number}'
     if cache_name:
         header += f': {cache_name}'
+    block = swudb.rotation_block(set_abbr)
+    if block is not None:
+        header += f"  [{'Block ' + block if block else 'no block — rotated'}]"
     print(header)
     status = inventory_status(set_abbr, number)
     if status:

@@ -47,8 +47,9 @@ MAIN_SET_CARD_THRESHOLD = 80
 # set_legality() from the /sets catalog and today's date.
 
 # Currently Premier-legal sets (main sets and sub sets). Update on rotation:
-# JTL rotates out when Legacy of Skywalker (set 10, first 2027 set) releases —
-# the plan appears to be rotating the oldest Premier-legal set annually.
+# sets rotate a whole block at a time (see ROTATION_BLOCKS). Block A (JTL,
+# LOF, SEC) rotates out when Legacy of Skywalker (set 10, first 2027 set)
+# releases.
 PREMIER_LEGAL_SETS = {"JTL", "LOF", "IBH", "SEC", "LAW", "ASH", "HMW"}
 
 # Upcoming sets that auto-flip Premier-legal at (release_date - PRERELEASE_DAYS),
@@ -61,6 +62,31 @@ PREMIER_ROTATED_SETS = {"SOR", "SHD", "TWI"}
 
 # Main-class sets that are never Premier-legal (currently TS26 — Twin-Suns-only).
 PREMIER_EXCLUDED_SETS = {"TS26"}
+
+# Rotation block per set — the letter printed in the rotation symbol at the
+# bottom of each card. Premier-only: a whole block rotates out together when
+# the first set of the year releases. '' = the original, unlettered block
+# (already rotated). Sets absent from the map (TS26 — Twin Suns / Eternal
+# only) have no block. Promo / OP sets inherit their parent's block.
+ROTATION_BLOCKS = {
+    "SOR": "", "SHD": "", "TWI": "",
+    "JTL": "A", "LOF": "A", "SEC": "A",
+    "IBH": "B", "LAW": "B", "ASH": "B", "HMW": "B", "IC27": "B",
+}
+
+
+def rotation_block(set_id, catalog=None):
+    """Return a set's rotation block: 'A' / 'B', '' for the unlettered first
+    block, or None when blocks don't apply (TS26, unknown sets).
+
+    Pass the /sets catalog to resolve promo / OP sets through parentSetId.
+    """
+    set_id = (set_id or '').upper()
+    if set_id not in ROTATION_BLOCKS and catalog:
+        info = next((s for s in catalog if s.get('setId') == set_id), None)
+        set_id = (info or {}).get('parentSetId') or set_id
+    return ROTATION_BLOCKS.get(set_id)
+
 
 # Days before release that pre-release events make a pending set Premier-legal.
 PRERELEASE_DAYS = 7
@@ -86,11 +112,13 @@ PREMIER_LEGAL_DATE_OVERRIDES = {
 
 # Card-name bans in Premier (independent of set legality).
 PREMIER_SUSPENDED_CARDS = {
-    "Boba Fett - Collecting the Bounty",
-    "Triple Dark Raid",
-    "Jango Fett - Concealing the Conspiracy",
-    "DJ - Blatant Thief",
-    "Force Throw",
+    # Suspended 8/2026 — the ASH 011 leader (other Cad Bane printings are legal).
+    "Cad Bane - Still Faster Than You",
+    # Suspended 11/9/26 (Premier Format Update: November 2026).
+    "Chimaera - A Frightening Reality",
+    "Koska Reeves - Warrior of Mandalore",
+    "Neel - The Cutest Boy",
+    "Aggressive Negotiations",
 }
 
 # On-disk cache of the /sets payload — keeps validator runs offline-capable.

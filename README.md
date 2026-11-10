@@ -196,6 +196,7 @@ How I set up my inventory. I set up my functions in `main.py` with this format i
 - In cell H1 of every tab I have the card count for that set(listed here: 'https://swudb.com/sets').
 - The card names are Column B starting at cell B3
 - Card rarities are column D starting at D3
+- `main.py` also writes the set's Premier rotation block into L1/M1 (`Rotation Block:` + `A`, `B`, `None (rotated)`, or `N/A` for Twin Suns sets)
 - Owned-copy counts are column C starting at C3 (used by `generate_buy_list.py`)
 - TCGplayer prices are columns H (Market) and I (Low) starting at row 3, written by `update_prices.py`
 ![Sheet Example](images/sheet-example.png)
@@ -272,6 +273,7 @@ PREMIER_LEGAL_DATE_OVERRIDES = {"IC27": "11/27/26"}  # explicit flip date when i
 PREMIER_ROTATED_SETS    = {"SOR", "SHD", "TWI"}
 PREMIER_EXCLUDED_SETS   = {"TS26"}       # main-class but never Premier-legal
 PREMIER_SUSPENDED_CARDS = {...}          # card-name bans, independent of set legality
+ROTATION_BLOCKS         = {"JTL": "A", "LAW": "B", ...}  # rotation-symbol letter per set ('' = unlettered first block)
 ```
 
 Everything else — Eternal and Twin Suns legality (currently no rotation or bans), promo / OP / prerelease parent inheritance, and the pre-release auto-flip — is derived automatically by `set_legality()` from the `/sets` API catalog and today's date.
@@ -288,7 +290,7 @@ Everything else — Eternal and Twin Suns legality (currently no rotation or ban
 
 **A pending set passes its pre-release threshold (e.g., `ASH` on 2026-07-10).** No action required — `set_legality()` auto-flips it Premier-legal. As a one-line cleanup, move the ID from `PREMIER_PENDING_SETS` to `PREMIER_LEGAL_SETS` so the data matches reality (done for `ASH` on 2026-07-26).
 
-**A set rotates out of Premier.** Move the ID from `PREMIER_LEGAL_SETS` to `PREMIER_ROTATED_SETS`. Cards from that set still pass Premier validation if their name appears in any set still in `PREMIER_LEGAL_SETS` (the reprint rule). Next expected: `JTL` rotates when Legacy of Skywalker (set 10) releases in 2027 — the announced plan appears to be rotating the oldest Premier-legal set annually.
+**A block rotates out of Premier.** Sets rotate a whole block at a time — the block is the letter in the rotation symbol at the bottom of each card, recorded in `ROTATION_BLOCKS` (no letter: `SOR`/`SHD`/`TWI`, already rotated; A: `JTL`/`LOF`/`SEC`; B: `IBH`/`LAW`/`ASH`/`HMW`/`IC27`; `TS26` has no block because blocks only apply to Premier). Move every ID in the block from `PREMIER_LEGAL_SETS` to `PREMIER_ROTATED_SETS`. Cards from those sets still pass Premier validation if their name appears in any set still in `PREMIER_LEGAL_SETS` (the reprint rule). Next expected: Block A rotates when Legacy of Skywalker (set 10) releases in early 2027. When a new set is added, give it a `ROTATION_BLOCKS` entry too; `refresh_cache.py --list` shows the block in its `blk` column and `find_card.py` prints it beside the card name.
 
 **A reprint sub set drops (like `IC27`, and Icons 2028 after it).** Add its ID to `SUB_SETS` and `PREMIER_PENDING_SETS` (or straight to `PREMIER_LEGAL_SETS` if it's already out). The reprint-name logic in `validate_deck_format.py` automatically re-enables any same-named rotated cards in Premier.
 
@@ -296,7 +298,7 @@ Everything else — Eternal and Twin Suns legality (currently no rotation or ban
 
 **Promo / OP / prerelease sets (`JTLOP`, `LAWOP`, `P26`, etc.).** No action needed. `set_legality()` follows `parentSetId` from `/sets` and inherits the parent's Premier legality automatically.
 
-**Cards get suspended or unsuspended in Premier.** Edit `PREMIER_SUSPENDED_CARDS` in `lib/swudb.py`.
+**Cards get suspended or unsuspended in Premier.** Edit `PREMIER_SUSPENDED_CARDS` in `lib/swudb.py`. Entries are full card names (`Name - Subtitle` for uniques) and are checked against leaders and bases as well as the main deck and sideboard. Last updated for the 11/9/26 Premier Format Update (Chimaera, Koska Reeves, Neel, Aggressive Negotiations) plus the ASH 011 Cad Bane leader. Eternal has no suspensions.
 
 ### Sanity-checking your changes
 

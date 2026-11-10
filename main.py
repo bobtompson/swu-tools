@@ -55,6 +55,20 @@ def get_ts26_deck_codes(card_num):
     return ", ".join(TS26_DECK_CODES.get(deck, deck) for deck in decks)
 
 
+def rotation_block_label(set_abbr):
+    """Text for a tab's M1 cell: the set's Premier rotation block."""
+    block = swudb.rotation_block(set_abbr)
+    if block is None:
+        return 'N/A'  # Twin Suns / Eternal only — blocks are Premier-only
+    return block or 'None (rotated)'
+
+
+def update_rotation_block(sheet, set_abbr):
+    """Write the 'Rotation Block:' label/value into L1/M1 of a set tab
+    (same label/value pattern as F1/G1 and J1/K1)."""
+    sheet.update([['Rotation Block:', rotation_block_label(set_abbr)]], 'L1:M1')
+
+
 def update_list_names(card_list):
     """Update the names and rarity columns in my inventory spreadsheet in google.
     Each Subsheet is a set name abbr. For TS26 the rarity column gets the
@@ -94,6 +108,7 @@ def update_list_names(card_list):
     rarity_data = [[val] for val in card_rarity]
     sheet.update(column_data, f"B3:B{len(card_names) + 3}")
     sheet.update(rarity_data, f"D3:D{len(card_names) + 3}")
+    update_rotation_block(sheet, card_list)
 
 
 # Press the green button in the gutter to run the script.

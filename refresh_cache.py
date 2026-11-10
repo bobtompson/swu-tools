@@ -28,6 +28,7 @@ from lib.swudb import (
     is_main_set,
     parse_release_date,
     premier_legal_date,
+    rotation_block,
     set_legality,
 )
 
@@ -112,14 +113,14 @@ def _run_list(show_all):
                            s.get('setId') or ''),
         )
         header = (f"{'setId':<8} {'parent':<7} {'cards':>5}  {'release':<10}  "
-                  f"{'cached':<12}  {'prem':<4} {'etrn':<4} {'TS':<3}  fullName")
-        sep_len = 96
+                  f"{'cached':<12}  {'blk':<3} {'prem':<4} {'etrn':<4} {'TS':<3}  fullName")
+        sep_len = 100
     else:
         filtered = [s for s in catalog if is_main_set(s)]
         filtered.sort(key=_release_key)
         header = (f"{'setId':<8} {'cards':>5}  {'release':<10}  {'cached':<12}  "
-                  f"{'prem':<4} {'etrn':<4} {'TS':<3}  fullName")
-        sep_len = 88
+                  f"{'blk':<3} {'prem':<4} {'etrn':<4} {'TS':<3}  fullName")
+        sep_len = 92
 
     print(header)
     print('-' * sep_len)
@@ -133,13 +134,15 @@ def _run_list(show_all):
         prem = _legality_cell(legality['premier'], set_id, catalog, today)
         etrn = '✓' if legality['eternal'] else '-'
         ts = '✓' if legality['twin_suns'] else '-'
+        block = rotation_block(set_id, catalog)
+        blk = '' if block is None else (block or '-')
         if show_all:
             parent = s.get('parentSetId') or ''
             print(f"{set_id:<8} {parent:<7} {cards:>5}  {release:<10}  "
-                  f"{cached:<12}  {prem:<4} {etrn:<4} {ts:<3}  {full_name}")
+                  f"{cached:<12}  {blk:<3} {prem:<4} {etrn:<4} {ts:<3}  {full_name}")
         else:
             print(f"{set_id:<8} {cards:>5}  {release:<10}  {cached:<12}  "
-                  f"{prem:<4} {etrn:<4} {ts:<3}  {full_name}")
+                  f"{blk:<3} {prem:<4} {etrn:<4} {ts:<3}  {full_name}")
 
     # Warn about main-class sets we don't yet support in VALID_SETS.
     remote_main_ids = {s.get('setId') for s in catalog if is_main_set(s)}

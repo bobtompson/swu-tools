@@ -262,6 +262,11 @@ def validate_premier(deck, premier_reprint_names, catalog=None):
     if catalog is None:
         catalog = get_sets_catalog()
 
+    # Leaders and bases live outside the main deck, so check them separately.
+    for card in deck["leaders"] + ([deck["base"]] if deck["base"] else []):
+        if format_card_name(card) in PREMIER_SUSPENDED_CARDS:
+            reasons.append(f"{card_printing_label(card)} is suspended in Premier.")
+
     for entry in deck["mainboard"] + deck["sideboard"]:
         card = entry["card"]
         set_abbr = entry["set"]
