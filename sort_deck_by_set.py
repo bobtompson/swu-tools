@@ -284,14 +284,13 @@ def parse_json(filepath):
 
 
 def fetch_deck_from_url(url):
-    """Fetch deck data from SWUDB URL and return (cards, metadata)."""
+    """Fetch deck data from a SWUDB or SWU Forge URL and return (cards, metadata)."""
     deck_id = vdf.extract_deck_id(url)
     if not deck_id:
         print(f"Error: Could not extract deck ID from URL: {url}")
         return None, None
 
-    api_url = f"https://www.swudb.com/api/deck/{deck_id}"
-    print(f"Fetching deck from: {api_url}")
+    print(f"Fetching deck from: {url}")
 
     try:
         data = vdf.fetch_deck_from_url(url)
@@ -329,7 +328,9 @@ def parse_swudb_json(data, deck_id):
     metadata = {
         'title': data.get('deckName', deck_id),
         'author': data.get('authorName'),
-        'format': DECK_FORMATS.get(deck_format_code, 'Unknown'),
+        # A source-declared format (SWU Forge: Limited, Eternal, ...) wins over
+        # the SWUDB numeric code.
+        'format': data.get('declaredFormat') or DECK_FORMATS.get(deck_format_code, 'Unknown'),
         'leader': extract_card_info(data.get('leader')),
         'second_leader': extract_card_info(data.get('secondLeader')),
         'base': extract_card_info(data.get('base'))
@@ -505,15 +506,16 @@ def get_url_output_path(deck_name, output_dir=None):
 def main():
     if len(sys.argv) < 2:
         print("Usage: python sort_deck_by_set.py <deck_file_or_url> [output_dir]")
-        print("  Supports: Picklist (.txt), JSON (.json), or SWUDB deck URL")
+        print("  Supports: Picklist (.txt), JSON (.json), or a SWUDB / SWU Forge deck URL")
         print("  Example URL: https://www.swudb.com/deck/RawKbHItN")
+        print("               https://swuforge.com/decks/cmvfptjup02qn01pjp1bhj64t")
         sys.exit(1)
 
     input_arg = sys.argv[1]
     output_dir = sys.argv[2] if len(sys.argv) > 2 else None
 
     # Check if input is a URL
-    if vdf.is_swudb_url(input_arg):
+    if vdf.is_deck_url(input_arg):
         cards, metadata = fetch_deck_from_url(input_arg)
         if not cards:
             print("No cards found from URL.")

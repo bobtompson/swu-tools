@@ -298,6 +298,12 @@ Everything else — Eternal and Twin Suns legality (currently no rotation or ban
 
 **Promo / OP / prerelease sets (`JTLOP`, `LAWOP`, `P26`, etc.).** No action needed. `set_legality()` follows `parentSetId` from `/sets` and inherits the parent's Premier legality automatically.
 
+**Deck sources.** Every script that takes a deck URL accepts both SWUDB (`https://www.swudb.com/deck/{id}`) and SWU Forge (`https://swuforge.com/decks/{id}`) links. SWU Forge decks are read from the site's export endpoint and filled in from the local swu-db cache (`lib/swuforge.py`); the deck must have link sharing on.
+
+**Limited (draft / sealed) decks.** `validate_deck_format.py` reports Limited alongside Premier, Eternal and Twin Suns: 1 leader, 1 base, a 30-card minimum, every card legal, and no limit on copies of a card. A deck is treated as Limited when SWU Forge says it is, or when a one-leader deck is too small for constructed (under 50) but at least 30. The minimums are `LIMITED_MIN_DECK_SIZE` / `CONSTRUCTED_MIN_DECK_SIZE` / `TWIN_SUNS_MIN_DECK_SIZE` in `lib/swudb.py`.
+
+**A base changes the minimum deck size.** Minimum deck sizes (50 for Premier / Eternal, 80 for Twin Suns; no maximum) are adjusted by two JTL bases: **Thermal Oscillator** lowers the minimum by 5 and **Data Vault** raises it by 10 (`BASE_MIN_DECK_SIZE_MODIFIERS`). Add any new one to that map in `lib/swudb.py`.
+
 **Cards get suspended or unsuspended in Premier.** Edit `PREMIER_SUSPENDED_CARDS` in `lib/swudb.py`. Entries are full card names (`Name - Subtitle` for uniques) and are checked against leaders and bases as well as the main deck and sideboard. Last updated for the 11/9/26 Premier Format Update (Chimaera, Koska Reeves, Neel, Aggressive Negotiations) plus the ASH 011 Cad Bane leader. Eternal has no suspensions.
 
 ### Sanity-checking your changes

@@ -37,7 +37,9 @@ CARD_DATA_DIR = os.path.join(os.path.dirname(__file__), 'card_data')
 # anything else (promos etc.) sorts alphabetically after these.
 ORDERED_SETS = MAIN_SETS_UPPER + SUB_SETS_UPPER
 
-DECK_URL_RE = re.compile(r'https?://(?:www\.)?swudb\.com/deck/[A-Za-z0-9]+')
+DECK_URL_RE = re.compile(
+    r'https?://(?:www\.)?(?:swudb\.com/deck/[A-Za-z0-9]+|swuforge\.com/decks/[A-Za-z0-9]+)'
+)
 
 # Marks databases created by this script so find_card.py can tell them
 # apart from other .db files in card_data/.
@@ -84,6 +86,8 @@ def classify_format(deck, premier_names):
     (code 1), so code-1 decks are classified by legality: Premier-legal
     decks are 'Premier', otherwise Eternal-legal decks are 'Eternal'.
     """
+    if vdf.is_limited(deck):
+        return 'Limited' if not vdf.validate_limited(deck) else 'Limited (illegal)'
     code = deck['deck_format_code']
     if code == 2:
         return 'Twin Suns'

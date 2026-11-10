@@ -110,6 +110,22 @@ PREMIER_LEGAL_DATE_OVERRIDES = {
     "IC27": "11/27/26",
 }
 
+# Bases whose text changes the minimum deck size (card name -> cards added to
+# the format minimum: 50 for Premier / Eternal, 80 for Twin Suns). Both are
+# JTL: Thermal Oscillator (025) "decreased by 5", Data Vault (024) "increased
+# by 10". There is no maximum deck size.
+BASE_MIN_DECK_SIZE_MODIFIERS = {
+    "Thermal Oscillator": -5,
+    "Data Vault": 10,
+}
+
+# Limited (draft / sealed): decks are built from 3-8 opened booster packs.
+# 1 leader, 1 base, a smaller minimum deck, every card legal, and no limit on
+# copies of a card (you play what you opened).
+LIMITED_MIN_DECK_SIZE = 30
+CONSTRUCTED_MIN_DECK_SIZE = 50
+TWIN_SUNS_MIN_DECK_SIZE = 80
+
 # Card-name bans in Premier (independent of set legality).
 PREMIER_SUSPENDED_CARDS = {
     # Suspended 8/2026 — the ASH 011 leader (other Cad Bane printings are legal).

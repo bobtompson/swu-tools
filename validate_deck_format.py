@@ -24,8 +24,13 @@ DECK_FORMATS = {
 
 # Format-legality constants and rules live in lib/swudb.py — single source of
 # truth for set lists, rotation, pre-release flips, and suspensions.
+from lib import swuforge  # noqa: E402
 from lib.swudb import (  # noqa: E402
     PREMIER_LEGAL_SETS,
+    BASE_MIN_DECK_SIZE_MODIFIERS,
+    CONSTRUCTED_MIN_DECK_SIZE,
+    LIMITED_MIN_DECK_SIZE,
+    TWIN_SUNS_MIN_DECK_SIZE,
     PREMIER_SUSPENDED_CARDS,
     get_sets_catalog,
     set_legality,
@@ -41,10 +46,10 @@ ALIGNMENT_ASPECT_IDS = {
 # Full SWUDB aspect id -> name mapping (ids appear in frontsideAspects and
 # the deck-level 'aspects' list).
 ASPECT_NAMES = {
-    1: "Vigilance",
+    1: "Aggression",
     2: "Command",
-    3: "Aggression",
-    4: "Cunning",
+    3: "Cunning",
+    4: "Vigilance",
     5: "Heroism",
     6: "Villainy",
 }
@@ -64,8 +69,15 @@ def is_swudb_url(input_str):
         return False
 
 
+def is_deck_url(input_str):
+    """Check if input is a deck URL from a supported site (SWUDB or SWU Forge)."""
+    return is_swudb_url(input_str) or swuforge.is_swuforge_url(input_str)
+
+
 def extract_deck_id(url):
-    """Extract deck ID from SWUDB URL."""
+    """Extract the deck ID from a SWUDB or SWU Forge deck URL."""
+    if swuforge.is_swuforge_url(url):
+        return swuforge.extract_deck_id(url)
     parsed = urlparse(url)
     path_parts = parsed.path.strip("/").split("/")
     if len(path_parts) >= 2 and path_parts[0] == "deck":
@@ -74,7 +86,15 @@ def extract_deck_id(url):
 
 
 def fetch_deck_from_url(url):
-    """Fetch deck JSON from SWUDB."""
+    """Fetch a deck as a SWUDB-shaped payload.
+
+    SWUDB URLs return the site's own API response; SWU Forge URLs are
+    converted to the same shape by lib.swuforge (card details come from the
+    local swu-db cache).
+    """
+    if swuforge.is_swuforge_url(url):
+        return swuforge.fetch_deck(url)
+
     deck_id = extract_deck_id(url)
     if not deck_id:
         raise ValueError(f"Could not extract deck ID from URL: {url}")
@@ -160,18 +180,43 @@ def normalize_deck(data):
 
     return {
         "title": data.get("deckName", "Unknown Deck"),
-        "url": f"https://www.swudb.com/deck/{data.get('deckId', '')}",
+        "url": data.get("deckUrl") or f"https://www.swudb.com/deck/{data.get('deckId', '')}",
         "deck_format_code": data.get("deckFormat"),
         "leaders": leaders,
         "base": base,
         "mainboard": mainboard,
         "sideboard": sideboard,
         "aspects": data.get("aspects") or [],
+        # Format the deck's owner picked, when the source says (SWU Forge).
+        "declared_format": data.get("declaredFormat"),
     }
 
 
+def is_limited(deck):
+    """True when a deck is a Limited (draft / sealed) deck.
+
+    A source that states the format decides it (SWU Forge, or a sorted .md
+    file's Format line). Otherwise it is inferred: a one-leader deck too small
+    for constructed but big enough for Limited can only be a Limited deck.
+    """
+    declared = deck.get("declared_format")
+    if declared:
+        return declared == "Limited"
+    if len(deck["leaders"]) != 1:
+        return False
+    count = sum(card["quantity"] for card in deck["mainboard"])
+    return (
+        min_deck_size(deck, LIMITED_MIN_DECK_SIZE)
+        <= count
+        < min_deck_size(deck, CONSTRUCTED_MIN_DECK_SIZE)
+    )
+
+
 def detect_deck_type(deck):
-    """Detect deck type using SWUDB metadata first, then structure."""
+    """Detect deck type: Limited first, then SWUDB metadata, then structure."""
+    if is_limited(deck):
+        return "Limited"
+
     deck_format_code = deck["deck_format_code"]
     if deck_format_code in DECK_FORMATS:
         return DECK_FORMATS[deck_format_code]
@@ -208,6 +253,27 @@ def get_premier_reprint_names():
     return premier_names
 
 
+def min_deck_size(deck, format_minimum):
+    """Minimum main-deck size for a deck: the format minimum (50 constructed,
+    80 Twin Suns) adjusted by the base's text (Thermal Oscillator -5, Data
+    Vault +10). Decks may always go over the minimum."""
+    base = deck.get("base") or {}
+    name = (base.get("cardName") or "").strip()
+    return format_minimum + BASE_MIN_DECK_SIZE_MODIFIERS.get(name, 0)
+
+
+def min_deck_size_reason(deck, format_minimum, label="Main deck"):
+    """Failure text when the main deck is under its minimum size, else None."""
+    count = sum(card["quantity"] for card in deck["mainboard"])
+    minimum = min_deck_size(deck, format_minimum)
+    if count >= minimum:
+        return None
+    base_note = ""
+    if minimum != format_minimum:
+        base_note = f" (minimum is {minimum} with {deck['base']['cardName']})"
+    return f"{label} must contain at least {minimum} cards; found {count}.{base_note}"
+
+
 def validate_constructed_structure(deck, max_copies):
     """Validate the shared one-leader constructed structure."""
     reasons = []
@@ -218,9 +284,9 @@ def validate_constructed_structure(deck, max_copies):
     if deck["base"] is None:
         reasons.append("Expected exactly 1 base; found 0.")
 
-    mainboard_count = sum(card["quantity"] for card in deck["mainboard"])
-    if mainboard_count < 50:
-        reasons.append(f"Main deck must contain at least 50 cards; found {mainboard_count}.")
+    size_reason = min_deck_size_reason(deck, CONSTRUCTED_MIN_DECK_SIZE)
+    if size_reason:
+        reasons.append(size_reason)
 
     sideboard_count = sum(card["quantity"] for card in deck["sideboard"])
     if sideboard_count > 10:
@@ -262,10 +328,20 @@ def validate_premier(deck, premier_reprint_names, catalog=None):
     if catalog is None:
         catalog = get_sets_catalog()
 
-    # Leaders and bases live outside the main deck, so check them separately.
+    # Leaders and bases live outside the main deck, so check them separately:
+    # the same suspension, set-legality, and reprint rules apply to them.
     for card in deck["leaders"] + ([deck["base"]] if deck["base"] else []):
-        if format_card_name(card) in PREMIER_SUSPENDED_CARDS:
+        name = format_card_name(card)
+        set_abbr = (card.get("defaultExpansionAbbreviation") or "").upper()
+        if name in PREMIER_SUSPENDED_CARDS:
             reasons.append(f"{card_printing_label(card)} is suspended in Premier.")
+        elif not set_legality(set_abbr, catalog)["premier"] and (
+            name.strip().lower() not in premier_reprint_names
+        ):
+            reasons.append(
+                f"{card_printing_label(card)} is from {set_abbr}, which is not "
+                f"Premier-legal, and the card has no sourced Premier-legal reprint."
+            )
 
     for entry in deck["mainboard"] + deck["sideboard"]:
         card = entry["card"]
@@ -300,6 +376,29 @@ def validate_eternal(deck):
     return dedupe_reasons(validate_constructed_structure(deck, max_copies=3))
 
 
+def validate_limited(deck):
+    """Validate Limited (draft / sealed) legality.
+
+    1 leader, 1 base, and a 30-card minimum main deck (adjusted by the base
+    like any other format). Every card is legal — no rotation, no suspensions
+    — and there is no limit on copies of a card or on sideboard size, since
+    the pool is whatever was opened.
+    """
+    reasons = []
+
+    if len(deck["leaders"]) != 1:
+        reasons.append(f"Expected exactly 1 leader; found {len(deck['leaders'])}.")
+
+    if deck["base"] is None:
+        reasons.append("Expected exactly 1 base; found 0.")
+
+    size_reason = min_deck_size_reason(deck, LIMITED_MIN_DECK_SIZE)
+    if size_reason:
+        reasons.append(size_reason)
+
+    return dedupe_reasons(reasons)
+
+
 def validate_twin_suns(deck):
     """Validate Twin Suns legality; no cards are currently suspended here."""
     reasons = []
@@ -311,9 +410,9 @@ def validate_twin_suns(deck):
     if deck["base"] is None:
         reasons.append("Twin Suns requires exactly 1 base; found 0.")
 
-    mainboard_count = sum(card["quantity"] for card in deck["mainboard"])
-    if mainboard_count < 80:
-        reasons.append(f"Twin Suns main deck must contain at least 80 cards; found {mainboard_count}.")
+    size_reason = min_deck_size_reason(deck, TWIN_SUNS_MIN_DECK_SIZE, label="Twin Suns main deck")
+    if size_reason:
+        reasons.append(size_reason)
 
     if leader_count == 2:
         leader_alignments = [extract_alignment(leader) for leader in deck["leaders"]]
@@ -359,13 +458,13 @@ def print_status(label, reasons):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Validate a SWUDB deck for Premier, Eternal, and Twin Suns legality."
+        description="Validate a SWUDB or SWU Forge deck for Premier, Eternal, Twin Suns, and Limited legality."
     )
-    parser.add_argument("url", help="SWUDB deck URL")
+    parser.add_argument("url", help="SWUDB or SWU Forge deck URL")
     args = parser.parse_args()
 
-    if not is_swudb_url(args.url):
-        print(f"Error: Invalid SWUDB deck URL: {args.url}")
+    if not is_deck_url(args.url):
+        print(f"Error: Invalid SWUDB / SWU Forge deck URL: {args.url}")
         raise SystemExit(1)
 
     try:
@@ -384,6 +483,7 @@ def main():
     premier_reasons = validate_premier(deck, premier_reprint_names)
     eternal_reasons = validate_eternal(deck)
     twin_suns_reasons = validate_twin_suns(deck)
+    limited_reasons = validate_limited(deck)
 
     print(f"# {deck['title']}")
     print(f"URL: {args.url}")
@@ -394,6 +494,8 @@ def main():
     print_status("Eternal", eternal_reasons)
     print()
     print_status("Twin Suns", twin_suns_reasons)
+    print()
+    print_status("Limited", limited_reasons)
 
 
 if __name__ == "__main__":

@@ -130,6 +130,9 @@ def _build_partial_deck(cards, metadata, source):
         "mainboard": mainboard,
         "sideboard": [],
         "aspects": [],
+        # File formats only state "Premier" / "Twin Suns" as a guess from the
+        # leader count, so only an explicit Limited line counts as declared.
+        "declared_format": "Limited" if declared_format == "Limited" else None,
         "metadata_complete": False,
         "source": source,
     }
@@ -244,8 +247,8 @@ def _from_markdown(source):
 
 
 def load_deck(source):
-    """Load a deck from a SWUDB URL, .json, .txt picklist, or sorted .md file."""
-    if vdf.is_swudb_url(source):
+    """Load a deck from a SWUDB or SWU Forge URL, .json, .txt picklist, or sorted .md file."""
+    if vdf.is_deck_url(source):
         return _from_url(source)
 
     if not os.path.exists(source):
@@ -260,7 +263,7 @@ def load_deck(source):
         return _from_picklist(source)
 
     raise ValueError(
-        f"Unsupported source: {source}. Expected SWUDB URL or .json/.txt/.md file."
+        f"Unsupported source: {source}. Expected SWUDB / SWU Forge URL or .json/.txt/.md file."
     )
 
 

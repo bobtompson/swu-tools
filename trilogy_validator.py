@@ -68,11 +68,9 @@ def _validate_per_deck(deck, deck_type, premier_reprint_names):
             reasons.append(f"Twin Suns requires exactly 2 leaders; found {len(deck['leaders'])}.")
         if deck["base"] is None:
             reasons.append("Twin Suns requires exactly 1 base; found 0.")
-        mainboard_count = sum(c["quantity"] for c in deck["mainboard"])
-        if mainboard_count < 80:
-            reasons.append(
-                f"Twin Suns main deck must contain at least 80 cards; found {mainboard_count}."
-            )
+        size_reason = vdf.min_deck_size_reason(deck, 80, label="Twin Suns main deck")
+        if size_reason:
+            reasons.append(size_reason)
         copies = Counter()
         for entry in deck["mainboard"] + deck["sideboard"]:
             copies[card_identity(entry["card"])] += entry["quantity"]
@@ -425,7 +423,10 @@ def _run_three(sources):
     limit = _limit_for(deck_type)
     if limit is None:
         print("# Trilogy: INVALID")
-        print(f"Cannot validate deck type: {deck_type}")
+        if deck_type == "Limited":
+            print("Limited (draft / sealed) decks cannot be used in a Trilogy.")
+        else:
+            print(f"Cannot validate deck type: {deck_type}")
         raise SystemExit(1)
     label = _format_label(deck_type)
 
