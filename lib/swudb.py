@@ -281,14 +281,148 @@ def save_to_cache(set_name, data):
         print(f"Warning: Could not save cache for {set_name.upper()}: {e}")
 
 
-def fetch_remote_cards(set_name, timeout=30):
+# swudb.com (a different site from swu-db.com) usually has a new set's full
+# card list weeks before swu-db does. Its search API returns every printing of
+# a set in one request; these enums translate its ids into swu-db's strings.
+SWUDB_COM_SEARCH_URL = 'https://swudb.com/api/search/set:{set_id}'
+SWUDB_COM_SOURCE = 'swudb.com'
+SWUDB_COM_RARITIES = {1: 'Common', 2: 'Uncommon', 3: 'Rare', 4: 'Legendary', 5: 'Special'}
+SWUDB_COM_TYPES = {0: 'Leader', 1: 'Base', 2: 'Unit', 3: 'Event', 4: 'Upgrade'}
+SWUDB_COM_ASPECTS = {1: 'Aggression', 2: 'Command', 3: 'Cunning',
+                     4: 'Vigilance', 5: 'Heroism', 6: 'Villainy'}
+SWUDB_COM_ARENAS = {0: 'Ground', 1: 'Space'}
+SWUDB_COM_VARIANTS = {1: 'Normal', 2: 'Hyperspace', 3: 'Showcase',
+                      4: 'OP', 5: 'Promo', 6: 'Prestige'}
+
+
+def _normalize_number(number):
+    """'38' / '038' -> '038'; non-numeric numbers ('T01') pass through."""
+    number = str(number)
+    return number.zfill(3) if number.isdigit() else number
+
+
+def _swudb_com_row(set_id, printing):
+    """Convert one swudb.com search printing into a swu-db-shaped card dict.
+
+    Only the fields swudb.com's search carries are filled: no card text,
+    keywords, cid, or tcgplayerId, and bases have no Subtitle (swudb.com
+    doesn't list their planet). The Source key marks the row as a fill-in.
+    """
+    card_type = SWUDB_COM_TYPES.get(printing.get('cardType'), '')
+    if printing.get('isToken'):
+        card_type = f'Token {card_type}'.strip()
+    variant = SWUDB_COM_VARIANTS.get(printing.get('variantType'), 'Normal')
+    # swu-db splits foils into their own variant types; showcases are always foil
+    if printing.get('foil') and variant in ('Hyperspace', 'Prestige'):
+        variant += ' Foil'
+
+    row = {
+        'Set': set_id,
+        'Number': str(printing.get('cardNumber', '')),
+        'Name': printing.get('cardName') or '',
+    }
+    if printing.get('cardTitle'):
+        row['Subtitle'] = printing['cardTitle']
+    row['Type'] = card_type
+    row['Aspects'] = [SWUDB_COM_ASPECTS[a] for a in printing.get('aspectIds') or []
+                      if a in SWUDB_COM_ASPECTS]
+    row['Traits'] = [t.strip().upper() for t in (printing.get('traits') or '').split(',')
+                     if t.strip()]
+    if printing.get('arena') in SWUDB_COM_ARENAS:
+        row['Arenas'] = [SWUDB_COM_ARENAS[printing['arena']]]
+    for key, field in (('Cost', 'cost'), ('Power', 'power'), ('HP', 'hp')):
+        if printing.get(field) is not None:
+            row[key] = str(printing[field])
+    row['DoubleSided'] = bool(printing.get('backImagePath'))
+    row['Rarity'] = SWUDB_COM_RARITIES.get(printing.get('rarity'), '')
+    row['Unique'] = bool(printing.get('isUnique'))
+    row['Artist'] = printing.get('artist') or ''
+    row['VariantType'] = variant
+    row['Source'] = SWUDB_COM_SOURCE
+    return row
+
+
+def fetch_swudb_com_cards(set_name, timeout=30):
+    """Fetch a set's card list (every printing) from swudb.com's search API,
+    converted to swu-db-shaped dicts. Raises requests.RequestException or
+    ValueError on failure."""
+    set_id = set_name.upper()
+    response = requests.get(
+        SWUDB_COM_SEARCH_URL.format(set_id=set_id),
+        params={'grouping': 'printings', 'sortorder': 'setno', 'sortdir': 'asc'},
+        headers={'User-Agent': 'swu-tools'},
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    return [_swudb_com_row(set_id, printing)
+            for printing in response.json().get('printings', [])
+            if printing.get('expansionAbbreviation', set_id).upper() == set_id]
+
+
+def _missing_numbered_cards(rows, card_count):
+    """How many of the numbered cards 1..card_count are absent from rows."""
+    present = {int(n) for n in (str(r.get('Number', '')) for r in rows) if n.isdigit()}
+    return sum(1 for n in range(1, card_count + 1) if n not in present)
+
+
+def fill_from_swudb_com(set_name, rows, timeout=30):
+    """Append swudb.com rows for every card number swu-db doesn't have yet.
+
+    swu-db rows are kept as-is (they carry card text and tcgplayerIds); only
+    absent numbers are added, tagged Source='swudb.com'. Returns the merged
+    list sorted by number, or the original rows if swudb.com can't be reached.
+    """
+    try:
+        extra = fetch_swudb_com_cards(set_name, timeout=timeout)
+    except (requests.RequestException, ValueError) as exc:
+        print(f"Warning: could not fill {set_name.upper()} gaps from swudb.com: {exc}")
+        return rows
+
+    have = {_normalize_number(r.get('Number', '')) for r in rows}
+    # Some sub set lists use unpadded numbers ('38'); match the existing style
+    unpadded = any(str(r.get('Number', '')).isdigit() and len(str(r['Number'])) < 3
+                   for r in rows)
+    added = []
+    for row in extra:
+        if _normalize_number(row['Number']) in have:
+            continue
+        if unpadded and row['Number'].isdigit():
+            row['Number'] = str(int(row['Number']))
+        added.append(row)
+    if not added:
+        return rows
+
+    print(f"{set_name.upper()}: swu-db is incomplete — filled {len(added)} "
+          f"printing(s) from swudb.com")
+
+    def sort_key(row):
+        number = str(row.get('Number', ''))
+        return (0, int(number), '') if number.isdigit() else (1, 0, number)
+
+    return sorted(rows + added, key=sort_key)
+
+
+def fetch_remote_cards(set_name, timeout=30, fill_gaps=True):
     """Fetch a set's card list (every printing) from the SWUDB API, bypassing
     the cache. Returns a list of card dicts; raises requests.RequestException
-    or ValueError on failure."""
+    or ValueError on failure.
+
+    When swu-db is missing some of the set's numbered cards (it lags during
+    spoiler season), the gaps are filled from swudb.com — see
+    fill_from_swudb_com. Pass fill_gaps=False for swu-db's list alone.
+    """
     response = requests.get(f'https://api.swu-db.com/cards/{set_name.lower()}',
                             timeout=timeout)
     response.raise_for_status()
-    return response.json().get('data', [])
+    rows = response.json().get('data', [])
+
+    if fill_gaps:
+        info = next((s for s in get_sets_catalog()
+                     if s.get('setId') == set_name.upper()), None)
+        card_count = (info or {}).get('numberCards')
+        if card_count and _missing_numbered_cards(rows, card_count):
+            rows = fill_from_swudb_com(set_name, rows, timeout=timeout)
+    return rows
 
 
 def get_swu_list(set_name, force_refresh=False, allow_unknown=False):

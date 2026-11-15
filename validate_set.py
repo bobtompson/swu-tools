@@ -1,8 +1,9 @@
-"""Check whether swu-db's card list for a set is complete and current.
+"""Check whether the card list for a set is complete and current.
 
-swu-db lags during spoiler season and right up to release. Run this before
-main.py: it compares the live card list against the set's announced card
-count, then against the local card_data/ cache that main.py actually reads.
+swu-db lags during spoiler season and right up to release; cards it doesn't
+have yet are filled in from swudb.com. Run this before main.py: it compares
+the live card list against the set's announced card count, then against the
+local card_data/ cache that main.py actually reads.
 
 Usage:
     uv run python validate_set.py hmw              # live list vs catalog vs cache
@@ -23,6 +24,7 @@ import requests
 
 from lib.swudb import (
     RELEASE_DATE_OVERRIDES,
+    SWUDB_COM_SOURCE,
     VALID_SETS,
     fetch_remote_cards,
     get_cache_path,
@@ -208,6 +210,10 @@ def validate_set(set_name, catalog, refresh, sheet):
     extras = len(rows) - len(online)
     print(f'  Online: {len(online)}/{card_count} numbered cards, '
           f'{len(rows)} printings total ({extras} variants/tokens)')
+    filled = sum(1 for card in online.values() if card.get('Source') == SWUDB_COM_SOURCE)
+    if filled:
+        print(f'  ⚠ swu-db has only {len(online) - filled} of them; the other '
+              f'{filled} came from swudb.com (no card text / TCGplayer ids)')
 
     complete = check_online(online, card_count)
     if complete:
@@ -225,7 +231,7 @@ def validate_set(set_name, catalog, refresh, sheet):
     if ready:
         print(f'  → Ready: main.py will use complete data for {set_id}')
     elif not complete:
-        print('  → Not ready: swu-db is still missing cards — check back later')
+        print('  → Not ready: swu-db and swudb.com are both missing cards — check back later')
     else:
         print(f'  → Refresh the cache first: validate_set.py {set_name} --refresh')
     return ready

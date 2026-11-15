@@ -38,6 +38,7 @@ Note: If you are not sure how to do this. ChatGPT generated a step by step how-t
 - `generate_buy_list.py` Scans the inventory tabs for cards short of a full playset (3 copies) and prints a priced buy list; `--cart` opens TCGplayer Mass Entry with the list pre-filled.
 - `showcase_prices.py` Prints TCGplayer prices for every set's showcase (collector leader) variants; `--update-sheet` also writes them to the Collector tab.
 - `prestige_prices.py` Prints TCGplayer prices for prestige variants (normal + foil tiers; serialized excluded). `--mark-sheet` bold-borders the column E cell of every prestige-printing card on the set tabs.
+- `mark_reprints.py` Lists the cards in each set that are reprints from an older main or sub set. `--mark-sheet` puts a bold red border on the column B (card name) cell of every reprint on the set tabs.
 
 **Note on private decks:** The SWUDB deck API only serves **Public** or **Unlisted** decks. A Private deck still renders in the browser but returns 404 from the API. Every deck-fetching script (`sort_deck_by_set.py`, `update_used_card_list.py`, `validate_deck_format.py`, `trilogy_validator.py`, `deck_diff.py`) prints a hint suggesting you change visibility to Unlisted when it sees a 404.
 
