@@ -43,6 +43,16 @@ COL_NUM, COL_NAME, COL_COUNT, COL_ORIGINAL, COL_SOURCE, COL_PRICE = range(6)
 #   P26: the TS26 pre-con leaders' prize wall showcases
 PROMO_SHOWCASES = {'p25': 'sor', 'p26': 'ts26'}
 
+# Sub sets whose own TCGplayer group carries (Showcase) leader printings.
+# IBH has none; TS26's showcases live in P26 (PROMO_SHOWCASES).
+SUB_SET_SHOWCASES = ['ic27']
+
+
+def default_set_names():
+    """Sets priced when no args are given: main sets, showcase sub sets, promos."""
+    own_group = [s for s in swudb.MAIN_SETS + SUB_SET_SHOWCASES if s in tcgcsv.GROUPS]
+    return own_group + list(PROMO_SHOWCASES)
+
 
 def original_card_number(set_df, variant_number):
     """Map a variant printing's number to the card's original number.
@@ -277,7 +287,7 @@ if __name__ == '__main__':
     if not with_stock:
         args.remove('--no-listings')
 
-    set_names = args or [s for s in swudb.MAIN_SETS if s in tcgcsv.GROUPS] + list(PROMO_SHOWCASES)
+    set_names = args or default_set_names()
     showcases_by_set = collect_showcases(set_names)
     if not showcases_by_set:
         print('No showcase data found.')

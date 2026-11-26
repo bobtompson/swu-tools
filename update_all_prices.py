@@ -55,9 +55,7 @@ def update_set_tabs(tab_titles):
 
 
 def update_collector():
-    showcase_set_names = ([s for s in swudb.MAIN_SETS if s in tcgcsv.GROUPS]
-                          + list(showcase_prices.PROMO_SHOWCASES))
-    showcases_by_set = showcase_prices.collect_showcases(showcase_set_names)
+    showcases_by_set = showcase_prices.collect_showcases(showcase_prices.default_set_names())
     if not showcases_by_set:
         raise RuntimeError('no showcase data found')
     showcase_prices.update_collector_sheet(showcases_by_set)
